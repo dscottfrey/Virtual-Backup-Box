@@ -1,0 +1,583 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		D27EAEB72F97FF9300EC7F0E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D27EAE9F2F97FF9100EC7F0E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D27EAEA62F97FF9100EC7F0E;
+			remoteInfo = "Virtual Backup Box";
+		};
+		D27EAEC12F97FF9300EC7F0E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D27EAE9F2F97FF9100EC7F0E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D27EAEA62F97FF9100EC7F0E;
+			remoteInfo = "Virtual Backup Box";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		D27EAEA72F97FF9100EC7F0E /* Virtual Backup Box.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Virtual Backup Box.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D27EAEB62F97FF9300EC7F0E /* Virtual Backup BoxTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Virtual Backup BoxTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D27EAEC02F97FF9300EC7F0E /* Virtual Backup BoxUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Virtual Backup BoxUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		D27EAEA92F97FF9100EC7F0E /* Virtual Backup Box */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Virtual Backup Box";
+			sourceTree = "<group>";
+		};
+		D27EAEB92F97FF9300EC7F0E /* Virtual Backup BoxTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Virtual Backup BoxTests";
+			sourceTree = "<group>";
+		};
+		D27EAEC32F97FF9300EC7F0E /* Virtual Backup BoxUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Virtual Backup BoxUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D27EAEA42F97FF9100EC7F0E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEB32F97FF9300EC7F0E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEBD2F97FF9300EC7F0E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D27EAE9E2F97FF9100EC7F0E = {
+			isa = PBXGroup;
+			children = (
+				D27EAEA92F97FF9100EC7F0E /* Virtual Backup Box */,
+				D27EAEB92F97FF9300EC7F0E /* Virtual Backup BoxTests */,
+				D27EAEC32F97FF9300EC7F0E /* Virtual Backup BoxUITests */,
+				D27EAEA82F97FF9100EC7F0E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D27EAEA82F97FF9100EC7F0E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D27EAEA72F97FF9100EC7F0E /* Virtual Backup Box.app */,
+				D27EAEB62F97FF9300EC7F0E /* Virtual Backup BoxTests.xctest */,
+				D27EAEC02F97FF9300EC7F0E /* Virtual Backup BoxUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D27EAEA62F97FF9100EC7F0E /* Virtual Backup Box */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D27EAECA2F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup Box" */;
+			buildPhases = (
+				D27EAEA32F97FF9100EC7F0E /* Sources */,
+				D27EAEA42F97FF9100EC7F0E /* Frameworks */,
+				D27EAEA52F97FF9100EC7F0E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D27EAEA92F97FF9100EC7F0E /* Virtual Backup Box */,
+			);
+			name = "Virtual Backup Box";
+			packageProductDependencies = (
+			);
+			productName = "Virtual Backup Box";
+			productReference = D27EAEA72F97FF9100EC7F0E /* Virtual Backup Box.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D27EAEB52F97FF9300EC7F0E /* Virtual Backup BoxTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D27EAECD2F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup BoxTests" */;
+			buildPhases = (
+				D27EAEB22F97FF9300EC7F0E /* Sources */,
+				D27EAEB32F97FF9300EC7F0E /* Frameworks */,
+				D27EAEB42F97FF9300EC7F0E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D27EAEB82F97FF9300EC7F0E /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D27EAEB92F97FF9300EC7F0E /* Virtual Backup BoxTests */,
+			);
+			name = "Virtual Backup BoxTests";
+			packageProductDependencies = (
+			);
+			productName = "Virtual Backup BoxTests";
+			productReference = D27EAEB62F97FF9300EC7F0E /* Virtual Backup BoxTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D27EAEBF2F97FF9300EC7F0E /* Virtual Backup BoxUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D27EAED02F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup BoxUITests" */;
+			buildPhases = (
+				D27EAEBC2F97FF9300EC7F0E /* Sources */,
+				D27EAEBD2F97FF9300EC7F0E /* Frameworks */,
+				D27EAEBE2F97FF9300EC7F0E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D27EAEC22F97FF9300EC7F0E /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D27EAEC32F97FF9300EC7F0E /* Virtual Backup BoxUITests */,
+			);
+			name = "Virtual Backup BoxUITests";
+			packageProductDependencies = (
+			);
+			productName = "Virtual Backup BoxUITests";
+			productReference = D27EAEC02F97FF9300EC7F0E /* Virtual Backup BoxUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D27EAE9F2F97FF9100EC7F0E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					D27EAEA62F97FF9100EC7F0E = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					D27EAEB52F97FF9300EC7F0E = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = D27EAEA62F97FF9100EC7F0E;
+					};
+					D27EAEBF2F97FF9300EC7F0E = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = D27EAEA62F97FF9100EC7F0E;
+					};
+				};
+			};
+			buildConfigurationList = D27EAEA22F97FF9100EC7F0E /* Build configuration list for PBXProject "Virtual Backup Box" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D27EAE9E2F97FF9100EC7F0E;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D27EAEA82F97FF9100EC7F0E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D27EAEA62F97FF9100EC7F0E /* Virtual Backup Box */,
+				D27EAEB52F97FF9300EC7F0E /* Virtual Backup BoxTests */,
+				D27EAEBF2F97FF9300EC7F0E /* Virtual Backup BoxUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D27EAEA52F97FF9100EC7F0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEB42F97FF9300EC7F0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEBE2F97FF9300EC7F0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D27EAEA32F97FF9100EC7F0E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEB22F97FF9300EC7F0E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D27EAEBC2F97FF9300EC7F0E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D27EAEB82F97FF9300EC7F0E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D27EAEA62F97FF9100EC7F0E /* Virtual Backup Box */;
+			targetProxy = D27EAEB72F97FF9300EC7F0E /* PBXContainerItemProxy */;
+		};
+		D27EAEC22F97FF9300EC7F0E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D27EAEA62F97FF9100EC7F0E /* Virtual Backup Box */;
+			targetProxy = D27EAEC12F97FF9300EC7F0E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		D27EAEC82F97FF9300EC7F0E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D27EAEC92F97FF9300EC7F0E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = B96HF9533R;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D27EAECB2F97FF9300EC7F0E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-Box";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D27EAECC2F97FF9300EC7F0E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-Box";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D27EAECE2F97FF9300EC7F0E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-BoxTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Virtual Backup Box.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Virtual Backup Box";
+			};
+			name = Debug;
+		};
+		D27EAECF2F97FF9300EC7F0E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-BoxTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Virtual Backup Box.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Virtual Backup Box";
+			};
+			name = Release;
+		};
+		D27EAED12F97FF9300EC7F0E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-BoxUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Virtual Backup Box";
+			};
+			name = Debug;
+		};
+		D27EAED22F97FF9300EC7F0E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = B96HF9533R;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.scottfrey.Virtual-Backup-BoxUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "Virtual Backup Box";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D27EAEA22F97FF9100EC7F0E /* Build configuration list for PBXProject "Virtual Backup Box" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D27EAEC82F97FF9300EC7F0E /* Debug */,
+				D27EAEC92F97FF9300EC7F0E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D27EAECA2F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup Box" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D27EAECB2F97FF9300EC7F0E /* Debug */,
+				D27EAECC2F97FF9300EC7F0E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D27EAECD2F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup BoxTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D27EAECE2F97FF9300EC7F0E /* Debug */,
+				D27EAECF2F97FF9300EC7F0E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D27EAED02F97FF9300EC7F0E /* Build configuration list for PBXNativeTarget "Virtual Backup BoxUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D27EAED12F97FF9300EC7F0E /* Debug */,
+				D27EAED22F97FF9300EC7F0E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D27EAE9F2F97FF9100EC7F0E /* Project object */;
+}
