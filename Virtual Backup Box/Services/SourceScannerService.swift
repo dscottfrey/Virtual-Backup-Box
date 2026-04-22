@@ -145,6 +145,7 @@ nonisolated enum SourceScannerService {
             )
 
             if shouldSkip(relativePath: relativePath, destURL: destURL,
+                          sourceFileSize: size,
                           verifiedRecords: verifiedRecords) {
                 toSkip.append(SourceFile(
                     url: url, relativePath: relativePath,
@@ -163,22 +164,36 @@ nonisolated enum SourceScannerService {
         return (toCopy, toSkip)
     }
 
-    /// Determines if a file can be skipped. All three conditions must be true:
-    /// 1. A verified DB record exists for this relative path.
-    /// 2. The record's destination path matches our computed destination.
-    /// 3. The destination file exists and its size matches the record.
+    /// Determines if a file can be skipped. Checks the destination filesystem
+    /// directly — if the file already exists with matching size, it is skipped
+    /// regardless of whether a database record exists. This makes the scan
+    /// resilient to database loss (app reinstall, migration, cleared history)
+    /// while still catching truncated or partial files from interrupted copies.
+    ///
+    /// When a DB record IS available, its stored size is used for the
+    /// comparison (extra confidence from a previous verified hash). When no
+    /// record exists, the source file size is compared directly.
     private static func shouldSkip(
         relativePath: String,
         destURL: URL,
+        sourceFileSize: Int64,
         verifiedRecords: [String: VerifiedFileInfo]
     ) -> Bool {
-        guard let record = verifiedRecords[relativePath],
-              record.absoluteDestinationPath == destURL.path,
-              FileManager.default.fileExists(atPath: destURL.path) else {
+        // Destination file must exist
+        guard FileManager.default.fileExists(atPath: destURL.path) else {
             return false
         }
+
         let destValues = try? destURL.resourceValues(forKeys: [.fileSizeKey])
         let destSize = Int64(destValues?.fileSize ?? -1)
-        return destSize == record.fileSizeBytes
+
+        // If a verified DB record exists, use its stored size
+        if let record = verifiedRecords[relativePath] {
+            return destSize == record.fileSizeBytes
+        }
+
+        // No DB record — compare destination size against source size.
+        // Handles database loss while still catching partial/truncated files.
+        return destSize == sourceFileSize
     }
 }
