@@ -78,6 +78,46 @@ enum VerificationEngine {
         return .success(record)
     }
 
+    /// Verifies an existing destination file that has no database record.
+    ///
+    /// Hashes the destination file and creates a FileRecord so the database
+    /// self-heals after a reinstall or history clear. No copy is performed —
+    /// the file is already at the destination with the correct size.
+    ///
+    /// The hash stored is the destination file's hash (which is the only
+    /// copy we have access to). This is correct: the destination IS the
+    /// verified copy.
+    static func verifyExisting(
+        destinationURL: URL,
+        sourceFile: SourceFile,
+        sourceRootPath: String,
+        session: CopySession,
+        context: ModelContext,
+        onProgress: @escaping @Sendable (Int64) -> Void
+    ) async -> VerificationResult {
+        let destHash: String
+        do {
+            destHash = try await hashFile(
+                at: destinationURL, onProgress: onProgress
+            )
+        } catch {
+            return .failure(.destinationReadError(underlying: error))
+        }
+
+        let record = FileRecord(
+            relativeSourcePath: sourceFile.relativePath,
+            absoluteSourceRoot: sourceRootPath,
+            absoluteDestinationPath: destinationURL.path,
+            sha256Hash: destHash,
+            fileSizeBytes: sourceFile.fileSizeBytes,
+            isSettingsFile: sourceFile.isSettingsFile
+        )
+        record.session = session
+        context.insert(record)
+
+        return .success(record)
+    }
+
     // MARK: - Private: File Hashing
 
     /// Reads a file in chunks and computes its SHA-256 hash.

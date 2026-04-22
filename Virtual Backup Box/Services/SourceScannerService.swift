@@ -43,7 +43,7 @@ nonisolated enum SourceScannerService {
             onProgress: onProgress
         )
 
-        let (toCopy, toSkip) = categoriseFiles(
+        let (toCopy, toVerify, toSkip) = categoriseFiles(
             rawFiles,
             targetURL: targetURL,
             sessionFolderName: sessionFolderName,
@@ -51,13 +51,13 @@ nonisolated enum SourceScannerService {
             verifiedRecords: verifiedRecords
         )
 
-        let totalBytes = toCopy.reduce(Int64(0)) { $0 + $1.fileSizeBytes }
-
         return ScanResult(
             filesToCopy: toCopy,
+            filesToVerifyOnly: toVerify,
             filesToSkip: toSkip,
             excludedCount: excludedCount,
-            totalBytesToCopy: totalBytes,
+            totalBytesToCopy: toCopy.reduce(Int64(0)) { $0 + $1.fileSizeBytes },
+            totalBytesToVerify: toVerify.reduce(Int64(0)) { $0 + $1.fileSizeBytes },
             sourceRootURL: sourceURL,
             targetRootURL: targetURL,
             sessionFolderName: sessionFolderName
@@ -121,16 +121,21 @@ nonisolated enum SourceScannerService {
 
     // MARK: - Step 2: Categorise Files
 
-    /// Compares each file against verified records and destination state
-    /// to determine whether it should be copied or skipped.
+    /// Compares each file against verified records and destination state.
+    /// Files are sorted into three buckets:
+    /// - copy: not at destination, needs full copy + verify
+    /// - verifyOnly: at destination with matching size but no DB record,
+    ///   needs hashing and a FileRecord created (self-heals the database)
+    /// - skip: has a verified DB record, nothing to do
     private static func categoriseFiles(
         _ files: [(url: URL, relativePath: String, size: Int64)],
         targetURL: URL,
         sessionFolderName: String,
         cameraModel: String?,
         verifiedRecords: [String: VerifiedFileInfo]
-    ) -> (toCopy: [SourceFile], toSkip: [SourceFile]) {
+    ) -> (toCopy: [SourceFile], toVerify: [SourceFile], toSkip: [SourceFile]) {
         var toCopy: [SourceFile] = []
+        var toVerify: [SourceFile] = []
         var toSkip: [SourceFile] = []
 
         for (url, relativePath, size) in files {
@@ -143,57 +148,61 @@ nonisolated enum SourceScannerService {
                 relativePath: relativePath,
                 cameraModel: cameraModel
             )
+            let status = classifyFile(
+                relativePath: relativePath,
+                destURL: destURL,
+                sourceFileSize: size,
+                verifiedRecords: verifiedRecords
+            )
 
-            if shouldSkip(relativePath: relativePath, destURL: destURL,
-                          sourceFileSize: size,
-                          verifiedRecords: verifiedRecords) {
-                toSkip.append(SourceFile(
-                    url: url, relativePath: relativePath,
-                    fileSizeBytes: size, status: .skip,
-                    isSettingsFile: isSettings, destinationURL: destURL
-                ))
-            } else {
-                toCopy.append(SourceFile(
-                    url: url, relativePath: relativePath,
-                    fileSizeBytes: size, status: .copy,
-                    isSettingsFile: isSettings, destinationURL: destURL
-                ))
+            let file = SourceFile(
+                url: url, relativePath: relativePath,
+                fileSizeBytes: size, status: status,
+                isSettingsFile: isSettings, destinationURL: destURL
+            )
+
+            switch status {
+            case .copy: toCopy.append(file)
+            case .verifyOnly: toVerify.append(file)
+            case .skip: toSkip.append(file)
             }
         }
 
-        return (toCopy, toSkip)
+        return (toCopy, toVerify, toSkip)
     }
 
-    /// Determines if a file can be skipped. Checks the destination filesystem
-    /// directly — if the file already exists with matching size, it is skipped
-    /// regardless of whether a database record exists. This makes the scan
-    /// resilient to database loss (app reinstall, migration, cleared history)
-    /// while still catching truncated or partial files from interrupted copies.
-    ///
-    /// When a DB record IS available, its stored size is used for the
-    /// comparison (extra confidence from a previous verified hash). When no
-    /// record exists, the source file size is compared directly.
-    private static func shouldSkip(
+    /// Determines the status for one file by checking the destination
+    /// filesystem and the database.
+    /// - skip: DB record exists and destination file matches → fully good
+    /// - verifyOnly: destination exists with matching size but no DB record
+    ///   → needs hashing to create a record (self-heals after reinstall)
+    /// - copy: destination doesn't exist or size doesn't match → full copy
+    private static func classifyFile(
         relativePath: String,
         destURL: URL,
         sourceFileSize: Int64,
         verifiedRecords: [String: VerifiedFileInfo]
-    ) -> Bool {
-        // Destination file must exist
+    ) -> FileStatus {
+        // Check if destination file exists
         guard FileManager.default.fileExists(atPath: destURL.path) else {
-            return false
+            return .copy
         }
 
         let destValues = try? destURL.resourceValues(forKeys: [.fileSizeKey])
         let destSize = Int64(destValues?.fileSize ?? -1)
 
-        // If a verified DB record exists, use its stored size
-        if let record = verifiedRecords[relativePath] {
-            return destSize == record.fileSizeBytes
+        // DB record exists with matching size → fully verified, skip
+        if let record = verifiedRecords[relativePath],
+           destSize == record.fileSizeBytes {
+            return .skip
         }
 
-        // No DB record — compare destination size against source size.
-        // Handles database loss while still catching partial/truncated files.
-        return destSize == sourceFileSize
+        // No DB record but destination size matches source → verify only
+        if destSize == sourceFileSize {
+            return .verifyOnly
+        }
+
+        // Size mismatch (truncated/partial file) → re-copy
+        return .copy
     }
 }

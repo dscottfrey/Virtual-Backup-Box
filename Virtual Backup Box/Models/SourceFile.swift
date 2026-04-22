@@ -8,11 +8,15 @@
 
 import Foundation
 
-/// Whether a scanned file needs to be copied or can be skipped.
+/// Whether a scanned file needs copying, verification only, or can be skipped.
 enum FileStatus: Sendable {
-    /// File needs to be copied and verified.
+    /// File needs to be copied and verified (not at destination).
     case copy
-    /// File already has a verified copy at the destination — skip it.
+    /// File exists at destination with matching size but has no database
+    /// record. Needs to be hashed and recorded — no copy required.
+    /// This self-heals the database after reinstall or history clear.
+    case verifyOnly
+    /// File already has a verified database record — skip entirely.
     case skip
 }
 

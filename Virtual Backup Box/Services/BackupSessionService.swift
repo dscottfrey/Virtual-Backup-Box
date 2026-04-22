@@ -37,14 +37,35 @@ enum BackupSessionService {
         modelContext.insert(session)
 
         // Initialise the ViewModel for the UI
-        sessionViewModel.totalFiles = scanResult.filesToCopy.count
-        sessionViewModel.totalBytesToProcess = scanResult.totalBytesToCopy
+        let copyCount = scanResult.filesToCopy.count
+        let verifyCount = scanResult.filesToVerifyOnly.count
+        sessionViewModel.totalFiles = copyCount + verifyCount
+        sessionViewModel.totalBytesToProcess =
+            scanResult.totalBytesToCopy + scanResult.totalBytesToVerify
         sessionViewModel.filesSkipped = scanResult.filesToSkip.count
         sessionViewModel.sessionStartDate = Date()
 
         let sourceRootPath = scanResult.sourceRootURL.path
 
-        // Process each file
+        // Phase 1: Verify-only files (exist at destination, need DB records)
+        for file in scanResult.filesToVerifyOnly {
+            if Task.isCancelled {
+                finalise(session: session, status: .interrupted,
+                         selectedCard: selectedCard,
+                         sessionViewModel: sessionViewModel)
+                return
+            }
+            await verifyExistingFile(
+                file,
+                sourceRootPath: sourceRootPath,
+                session: session,
+                sessionViewModel: sessionViewModel,
+                modelContext: modelContext
+            )
+            sessionViewModel.currentPhase = .idle
+        }
+
+        // Phase 2: Copy files (not at destination, full copy + verify)
         for file in scanResult.filesToCopy {
             if Task.isCancelled {
                 finalise(session: session, status: .interrupted,
@@ -85,6 +106,54 @@ enum BackupSessionService {
         finalise(session: session, status: status,
                  selectedCard: selectedCard,
                  sessionViewModel: sessionViewModel)
+    }
+
+    // MARK: - Verify-Only Processing
+
+    /// Hashes an existing destination file and creates a FileRecord.
+    /// No copy is performed — the file is already at the destination.
+    /// This self-heals the database after reinstall or history clear.
+    private static func verifyExistingFile(
+        _ file: SourceFile,
+        sourceRootPath: String,
+        session: CopySession,
+        sessionViewModel: SessionViewModel,
+        modelContext: ModelContext
+    ) async {
+        let fileName = file.relativePath
+        let totalBytes = file.fileSizeBytes
+
+        sessionViewModel.currentPhase = .verifying(
+            fileName: fileName, bytesRead: 0, totalBytes: totalBytes
+        )
+
+        let result = await VerificationEngine.verifyExisting(
+            destinationURL: file.destinationURL,
+            sourceFile: file,
+            sourceRootPath: sourceRootPath,
+            session: session,
+            context: modelContext
+        ) { bytesRead in
+            Task { @MainActor in
+                sessionViewModel.currentPhase = .verifying(
+                    fileName: fileName,
+                    bytesRead: bytesRead,
+                    totalBytes: totalBytes
+                )
+            }
+        }
+
+        switch result {
+        case .success:
+            session.filesCopied += 1
+            sessionViewModel.filesCompleted += 1
+            sessionViewModel.totalBytesWritten += file.fileSizeBytes
+        case .failure:
+            // Verify-only failure is unusual — file existed but couldn't
+            // be read. Record as failed but don't block the session.
+            session.filesFailed += 1
+            sessionViewModel.filesFailed += 1
+        }
     }
 
     // MARK: - Per-File Processing

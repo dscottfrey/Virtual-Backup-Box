@@ -28,7 +28,10 @@ struct ScanSummaryView: View {
             if result.isFullyBackedUp {
                 allBackedUpSection
             } else {
-                filesToCopySection
+                if !result.filesToCopy.isEmpty {
+                    filesToCopySection
+                }
+                verifyOnlySection
             }
 
             alreadyBackedUpSection
@@ -73,6 +76,25 @@ struct ScanSummaryView: View {
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Verify Only
+
+    @ViewBuilder
+    private var verifyOnlySection: some View {
+        if !result.filesToVerifyOnly.isEmpty {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Already at destination")
+                        .font(.headline)
+                    Text("\(result.filesToVerifyOnly.count) files \u{2014} \(formattedBytes(result.totalBytesToVerify)) \u{2014} will verify and record")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 
     // MARK: - Already Backed Up
