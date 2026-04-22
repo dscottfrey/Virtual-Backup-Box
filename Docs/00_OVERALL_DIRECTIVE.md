@@ -30,10 +30,10 @@ identically regardless of what storage medium they live on.
 
 Examples of valid source → target combinations:
 - Camera card → external SSD *(primary use case)*
-- Camera card → internal iPad storage *(staging, when no drive is available)*
+- Camera card → VBB Internal Storage *(staging, when no drive is available)*
 - Camera card → iCloud Drive *(direct to cloud)*
-- Internal iPad storage → external SSD *(offload staged files)*
-- Internal iPad storage → iCloud Drive *(offload staged files to cloud)*
+- Internal local storage → external SSD *(offload staged files)*
+- Internal local storage → iCloud Drive *(offload staged files to cloud)*
 - External SSD → second external SSD *(backup of a backup)*
 
 ### iCloud Drive as a Target
@@ -51,14 +51,14 @@ database record is proof the file was there and verified at time of backup.
 ### Post-Backup Source Cleanup
 
 When a backup session completes with **100% success** (no failures, all files verified),
-and the source was internal iPad storage, the app offers to remove the source files
-from iPad storage. This is the intended workflow for users who use the iPad as a
+and the source was VBB Internal Storage, the app offers to remove the source files
+from local storage. This is the intended workflow for users who use the device as a
 staging area between card and cloud/drive:
 
-1. Copy card → iPad internal storage (first safe copy)
-2. Back up iPad internal storage → iCloud Drive or external SSD (verified backup)
-3. App offers: "Remove from iPad storage?" — user confirms
-4. App deletes the source files, freeing iPad space
+1. Copy card → VBB Internal Storage (first safe copy)
+2. Back up VBB Internal Storage → iCloud Drive or external SSD (verified backup)
+3. App offers: "Remove from local storage?" — user confirms
+4. App deletes the source files, freeing device space
 
 This cleanup action is:
 - **Never automatic.** Always requires explicit user confirmation.
@@ -139,12 +139,13 @@ known; only the source needs selection.
 
 | # | Module | Status |
 |---|--------|--------|
-| 1 | Source & Destination Selection | 🔲 Not started |
-| 2 | Source Scanning & Incremental Comparison | 🔲 Not started |
-| 3 | Copy Engine | 🔲 Not started |
-| 4 | Verification | 🔲 Not started |
-| 5 | Progress & Status UI | 🔲 Not started |
-| 6 | Results & History | 🔲 Not started |
+| 1 | Source & Destination Selection | ✅ Built |
+| 2 | Source Scanning & Incremental Comparison | ✅ Built |
+| 3 | Copy Engine | ✅ Built |
+| 4 | Verification | ✅ Built |
+| 5 | Progress & Status UI | ✅ Built |
+| 6 | Results & History | ✅ Built |
+| 7 | File Browser | ✅ Built |
 
 ---
 
@@ -449,7 +450,14 @@ Describe the problem, propose an alternative, and let Scott decide.
 | 2026-04-21 | Source and target are symmetric — any accessible folder can be either. Storage medium (card, internal storage, external drive) is irrelevant to the copy engine. One source at a time. Source is always selected fresh via system picker (transient). Target is persisted via security-scoped bookmark (reconnects automatically). Camera-card enhancements (UUID, EXIF naming, dated folder) activate only when a card volume is detected. |
 | 2026-04-21 | iCloud Drive is a fully supported target. Treated as any other folder by the copy engine. iCloud's eviction of local copies is expected and desirable — the database checksum record is sufficient proof of verified backup. |
 | 2026-04-21 | Available space: use volumeAvailableCapacityForImportantUsageKey as a soft warning only (warn under 2 GB, constant named minimumWarningSpaceBytes). Never block a session. Actual disk-full errors handled by retry-then-skip policy. |
-| 2026-04-21 | Post-backup source cleanup: after a 100% successful session where source was internal iPad storage, offer to delete source files from iPad. Explicit user confirmation required. Never automatic. Logged in session history. Implemented in Module 6. |
+| 2026-04-21 | Post-backup source cleanup: after a 100% successful session where source was VBB Internal Storage, offer to delete source files from the device. Explicit user confirmation required. Never automatic. Logged in session history. Implemented in Module 6. |
+| 2026-04-22 | All 7 modules built and tested on device. Core backup flow working: card → VBB Internal Storage, card → iCloud Drive, internal → external confirmed. |
+| 2026-04-22 | Incremental scan fix: match FileRecords by destination path prefix (stable) instead of source root path (changes on each USB mount). Also added filesystem-level skip check — if destination file exists with matching size, skip even without a DB record. |
+| 2026-04-22 | Verify-only mode: when destination file exists with matching size but no DB record, hash the destination and create a FileRecord without copying. Self-heals the database after reinstall or history clear. |
+| 2026-04-22 | Source picker: security-scoped bookmark saved to UserDefaults after each pick. On next present, picker opens at the bookmarked location. Fallback: non-resolving URL forces Browse/Locations view instead of iOS "last used" default. |
+| 2026-04-22 | VBB Internal Storage: app creates Documents/VBB Internal Storage folder as a built-in target. UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace set so it appears in Files app. Internal archives shown as one-tap source options on the main screen. |
+| 2026-04-22 | Debug logging: file-based logger (DebugLogService) writes to user-selected iCloud Drive folder. Needed because USB port is occupied by card reader during testing. Configurable in Settings. |
+| 2026-04-22 | Terminology: all "iPad" references in code and UI replaced with "local storage." Cleanup offer trigger tightened to only fire when source is specifically VBB Internal Storage (not iCloud Drive or other "internal" volumes). |
 
 ---
 

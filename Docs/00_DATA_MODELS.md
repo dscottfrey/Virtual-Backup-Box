@@ -188,6 +188,10 @@ final class CopySession {
     // .inProgress while running, .success, .partialSuccess, or .interrupted when done.
     var status: SessionStatus
 
+    // Whether source files were deleted from local storage after a
+    // successful session (Module 6 cleanup offer). Defaults to false.
+    var sourceFilesDeleted: Bool
+
     // The known card this session backed up, if source was a camera card.
     // Nil for generic folder sources.
     var sourceCard: KnownCard?
