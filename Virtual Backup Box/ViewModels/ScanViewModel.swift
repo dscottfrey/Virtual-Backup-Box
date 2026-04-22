@@ -92,6 +92,8 @@ class ScanViewModel {
 
         scanResult = result
         isScanning = false
+
+        DebugLogService.shared.log("Scan complete: \(result.filesToCopy.count) to copy, \(result.filesToVerifyOnly.count) to verify, \(result.filesToSkip.count) to skip, \(result.excludedCount) excluded")
     }
 
     // MARK: - Database Query

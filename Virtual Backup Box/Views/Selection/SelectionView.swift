@@ -20,6 +20,7 @@ struct SelectionView: View {
     @State var showingHistory = false
     @State var showingFileBrowser = false
     @State var showingResetConfirmation = false
+    @State var showingSettings = false
     @State var scanViewModel: ScanViewModel?
     @State var navigateToScan = false
     @State var sessionViewModel: SessionViewModel?
@@ -51,6 +52,12 @@ struct SelectionView: View {
                         } label: {
                             Label("History", systemImage: "clock.arrow.circlepath")
                         }
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Label("Settings", systemImage: "gear")
+                        }
+                        Divider()
                         Button {
                             FolderPickerView.clearBookmark()
                         } label: {
@@ -89,6 +96,9 @@ struct SelectionView: View {
             }
             .sheet(isPresented: $showingFileBrowser) {
                 FileBrowserView()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .confirmationDialog(
                 "Reset Database",

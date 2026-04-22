@@ -56,7 +56,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
 
         picker.directoryURL = startURL
 
-        print("[FolderPicker] directoryURL set to: \(startURL.path)")
+        DebugLogService.shared.log("[FolderPicker] directoryURL set to: \(startURL.path)")
         return picker
     }
 
@@ -74,7 +74,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
         guard let data = UserDefaults.standard.data(
             forKey: bookmarkKey
         ) else {
-            print("[FolderPicker] No saved bookmark — using fallback")
+            DebugLogService.shared.log("[FolderPicker] No saved bookmark — using fallback")
             return nil
         }
 
@@ -85,7 +85,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
-            print("[FolderPicker] Bookmark failed to resolve — clearing")
+            DebugLogService.shared.log("[FolderPicker] Bookmark failed to resolve — clearing")
             UserDefaults.standard.removeObject(forKey: bookmarkKey)
             return nil
         }
@@ -98,17 +98,17 @@ struct FolderPickerView: UIViewControllerRepresentable {
                 relativeTo: nil
             ) {
                 UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
-                print("[FolderPicker] Refreshed stale bookmark")
+                DebugLogService.shared.log("[FolderPicker] Refreshed stale bookmark")
             } else {
                 UserDefaults.standard.removeObject(forKey: bookmarkKey)
-                print("[FolderPicker] Stale bookmark could not refresh — clearing")
+                DebugLogService.shared.log("[FolderPicker] Stale bookmark could not refresh — clearing")
                 return nil
             }
         }
 
         // Check the volume is actually mounted
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("[FolderPicker] Bookmarked path not mounted — using fallback")
+            DebugLogService.shared.log("[FolderPicker] Bookmarked path not mounted — using fallback")
             return nil
         }
 
@@ -116,7 +116,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
         if url.startAccessingSecurityScopedResource() {
             coordinator.accessedURL = url
         }
-        print("[FolderPicker] Resolved bookmark: \(url.path)")
+        DebugLogService.shared.log("[FolderPicker] Resolved bookmark: \(url.path)")
         return url
     }
 
@@ -130,9 +130,9 @@ struct FolderPickerView: UIViewControllerRepresentable {
                 relativeTo: nil
             )
             UserDefaults.standard.set(data, forKey: bookmarkKey)
-            print("[FolderPicker] Saved bookmark for: \(url.path)")
+            DebugLogService.shared.log("[FolderPicker] Saved bookmark for: \(url.path)")
         } catch {
-            print("[FolderPicker] Failed to save bookmark: \(error)")
+            DebugLogService.shared.log("[FolderPicker] Failed to save bookmark: \(error)")
         }
     }
 

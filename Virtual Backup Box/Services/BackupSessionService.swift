@@ -46,6 +46,11 @@ enum BackupSessionService {
         sessionViewModel.sessionStartDate = Date()
 
         let sourceRootPath = scanResult.sourceRootURL.path
+        let log = DebugLogService.shared
+
+        log.log("Session started: \(copyCount) to copy, \(verifyCount) to verify, \(scanResult.filesToSkip.count) skipped")
+        log.log("Source: \(scanResult.sourceRootURL.path)")
+        log.log("Target: \(scanResult.targetRootURL.path)/\(scanResult.sessionFolderName)")
 
         // Phase 1: Verify-only files (exist at destination, need DB records)
         for file in scanResult.filesToVerifyOnly {
@@ -103,6 +108,7 @@ enum BackupSessionService {
         // Determine final status
         let status: SessionStatus = session.filesFailed > 0
             ? .partialSuccess : .success
+        log.log("Session finished: \(status.rawValue) — \(session.filesCopied) copied, \(session.filesFailed) failed, \(session.filesSkipped) skipped")
         finalise(session: session, status: status,
                  selectedCard: selectedCard,
                  sessionViewModel: sessionViewModel)
