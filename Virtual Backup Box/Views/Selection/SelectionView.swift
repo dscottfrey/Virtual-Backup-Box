@@ -20,6 +20,7 @@ struct SelectionView: View {
     @State var showingHistory = false
     @State var showingFileBrowser = false
     @State var showingSourcePickerAtLastLocation = false
+    @State var showingResetConfirmation = false
     @State var scanViewModel: ScanViewModel?
     @State var navigateToScan = false
     @State var sessionViewModel: SessionViewModel?
@@ -45,10 +46,19 @@ struct SelectionView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingHistory = true
+                    Menu {
+                        Button {
+                            showingHistory = true
+                        } label: {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                        Button(role: .destructive) {
+                            showingResetConfirmation = true
+                        } label: {
+                            Label("Reset Database", systemImage: "trash")
+                        }
                     } label: {
-                        Image(systemName: "clock.arrow.circlepath")
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
@@ -88,6 +98,18 @@ struct SelectionView: View {
             }
             .sheet(isPresented: $showingFileBrowser) {
                 FileBrowserView()
+            }
+            .confirmationDialog(
+                "Reset Database",
+                isPresented: $showingResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Reset All Records", role: .destructive) {
+                    resetDatabase()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This deletes all backup history, file records, known cards, and known targets from the database. Files on disk are not affected. The app will behave as if freshly installed.")
             }
             .navigationDestination(isPresented: $navigateToScan) {
                 if let scanVM = scanViewModel {
@@ -180,6 +202,33 @@ struct SelectionView: View {
         }
         .buttonStyle(.borderedProminent)
         .disabled(!viewModel.isReady)
+    }
+
+    // MARK: - Reset Database
+
+    /// Deletes all SwiftData records (sessions, file records, known cards,
+    /// known targets). Files on disk are not affected. The app returns to
+    /// a fresh-install state. Useful for clearing stale records during
+    /// development or after a schema change.
+    private func resetDatabase() {
+        let context = modelContext
+        let sessions = (try? context.fetch(FetchDescriptor<CopySession>())) ?? []
+        for s in sessions { context.delete(s) }
+        let cards = (try? context.fetch(FetchDescriptor<KnownCard>())) ?? []
+        for c in cards { context.delete(c) }
+        let targets = (try? context.fetch(FetchDescriptor<KnownTarget>())) ?? []
+        for t in targets { context.delete(t) }
+        let records = (try? context.fetch(FetchDescriptor<FileRecord>())) ?? []
+        for r in records { context.delete(r) }
+
+        // Reset ViewModel state
+        viewModel.activeTarget = nil
+        viewModel.activeTargetURL = nil
+        viewModel.availableSpaceBytes = nil
+        viewModel.sourceURL = nil
+        viewModel.selectedCard = nil
+        viewModel.sourceDisplayName = ""
+        viewModel.resolveKnownTargets()
     }
 }
 
