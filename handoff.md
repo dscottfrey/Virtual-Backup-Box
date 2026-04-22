@@ -38,23 +38,27 @@
 
 4. **Terminology** — Scott noted: "the term bookmarks will confuse users." Anywhere the app surfaces "bookmark" language to the user, replace with something clearer (e.g. "saved location," "remembered drive").
 
+5. **Show log folder path in Settings** — When a debug log folder is selected, display the path to the folder in the Settings screen so the user can see where logs are being written.
+
+6. **Rename "Start Backup" button to "Verify Backup Flow"** — On the main screen where source and target are chosen, change the button label from "Start Backup" to "Verify Backup Flow."
+
 ### Technical Debt
 
-5. **Orphaned print statements** — Some `print()` calls may remain in files other than FolderPickerView. Search for `print(` and replace with `DebugLogService.shared.log()` where appropriate. Remove any that are no longer useful.
+7. **Orphaned print statements** — Some `print()` calls may remain in files other than FolderPickerView. Search for `print(` and replace with `DebugLogService.shared.log()` where appropriate. Remove any that are no longer useful.
 
-6. **SelectionView size** — SelectionView.swift is the navigation coordinator for the entire app. At ~195 lines it's within limits but will grow as features are added. Consider extracting navigation logic into a dedicated coordinator if it exceeds ~200 again.
+8. **SelectionView size** — SelectionView.swift is the navigation coordinator for the entire app. At ~195 lines it's within limits but will grow as features are added. Consider extracting navigation logic into a dedicated coordinator if it exceeds ~200 again.
 
-7. **SwiftData persistence verification** — Scott observed that the database may not persist across app reinstalls (expected) but the app should handle this gracefully. The verify-only mode now handles this case, but worth testing: kill app → relaunch → same card + target → should show "nothing to copy" or "X files to verify."
+9. **SwiftData persistence verification** — Scott observed that the database may not persist across app reinstalls (expected) but the app should handle this gracefully. The verify-only mode now handles this case, but worth testing: kill app → relaunch → same card + target → should show "nothing to copy" or "X files to verify."
 
-8. **Module 7 File Browser** — Built but lightly tested. Needs device testing with actual CR3 files. The spec notes that the simulator may not support CR3 — test on real hardware. If ImageIO doesn't produce thumbnails, there's a byte-offset fallback described in the Module 7 spec.
+10. **Module 7 File Browser** — Built but lightly tested. Needs device testing with actual CR3 files. The spec notes that the simulator may not support CR3 — test on real hardware. If ImageIO doesn't produce thumbnails, there's a byte-offset fallback described in the Module 7 spec.
 
 ### Features Not Yet Built
 
-9. **Camera Settings Restore (§9.1)** — Stretch goal. The architecture supports it (KnownCard stores cameraModel, FileRecord has isSettingsFile flag, SettingsFilePatterns lookup table exists). Not implemented.
+11. **Camera Settings Restore (§9.1)** — Stretch goal. The architecture supports it (KnownCard stores cameraModel, FileRecord has isSettingsFile flag, SettingsFilePatterns lookup table exists). Not implemented.
 
-10. **Deep Verify** — Future feature noted in Module 4. Re-hash all destination files and compare against stored FileRecord hashes to confirm nothing has changed on the target drive. VerificationEngine's interface was deliberately kept clean to support this.
+12. **Deep Verify** — Future feature noted in Module 4. Re-hash all destination files and compare against stored FileRecord hashes to confirm nothing has changed on the target drive. VerificationEngine's interface was deliberately kept clean to support this.
 
-11. **Pause/Resume** — Only cancel is implemented for v1. Pause deferred to v2.
+13. **Pause/Resume** — Only cancel is implemented for v1. Pause deferred to v2.
 
 ## File Count
 
