@@ -43,6 +43,17 @@ it later.
 
 ---
 
+## Git Commits
+
+- **Commit after every change.** Do not batch multiple changes into one commit.
+- Every commit message must include:
+  1. A clear summary line describing what changed.
+  2. Scott's original prompt/request that triggered the change (quoted in the body).
+  3. What was changed and why.
+- This allows any change to be traced back to the request that caused it and reverted if necessary.
+
+---
+
 ## Working Style
 
 - Summarise what you're going to build and in what order **before** writing any code.
