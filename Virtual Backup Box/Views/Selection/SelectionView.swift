@@ -19,7 +19,6 @@ struct SelectionView: View {
     @State var showingManageTargets = false
     @State var showingHistory = false
     @State var showingFileBrowser = false
-    @State var showingSourcePickerAtLastLocation = false
     @State var showingResetConfirmation = false
     @State var scanViewModel: ScanViewModel?
     @State var navigateToScan = false
@@ -52,6 +51,11 @@ struct SelectionView: View {
                         } label: {
                             Label("History", systemImage: "clock.arrow.circlepath")
                         }
+                        Button {
+                            FolderPickerView.clearBookmark()
+                        } label: {
+                            Label("Reset Source Bookmark", systemImage: "arrow.uturn.backward")
+                        }
                         Button(role: .destructive) {
                             showingResetConfirmation = true
                         } label: {
@@ -65,25 +69,12 @@ struct SelectionView: View {
             .task { viewModel.setup(context: modelContext) }
             .sheet(isPresented: $viewModel.showingSourcePicker) {
                 FolderPickerView(
-                    initialDirectory: URL(fileURLWithPath: "/"),
                     onPicked: { url in
                         viewModel.showingSourcePicker = false
                         Task { await viewModel.handleSourceSelected(url: url) }
                     },
                     onCancelled: {
                         viewModel.showingSourcePicker = false
-                    }
-                )
-            }
-            .sheet(isPresented: $showingSourcePickerAtLastLocation) {
-                FolderPickerView(
-                    initialDirectory: nil,
-                    onPicked: { url in
-                        showingSourcePickerAtLastLocation = false
-                        Task { await viewModel.handleSourceSelected(url: url) }
-                    },
-                    onCancelled: {
-                        showingSourcePickerAtLastLocation = false
                     }
                 )
             }

@@ -142,24 +142,13 @@ extension SelectionView {
                 }
             }
 
-            // Picker buttons
-            HStack(spacing: 16) {
-                Button {
-                    viewModel.showingSourcePicker = true
-                } label: {
-                    Label(
-                        viewModel.sourceURL == nil ? "Select Source" : "Change Source",
-                        systemImage: "folder"
-                    )
-                }
-
-                Button {
-                    showingSourcePickerAtLastLocation = true
-                } label: {
-                    Text("(last location)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            Button {
+                viewModel.showingSourcePicker = true
+            } label: {
+                Label(
+                    viewModel.sourceURL == nil ? "Select Source" : "Change Source",
+                    systemImage: "folder"
+                )
             }
         }
         .padding()
