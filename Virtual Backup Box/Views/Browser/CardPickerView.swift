@@ -1,7 +1,7 @@
 // CardPickerView.swift
 // Virtual Backup Box
 //
-// Lists all card mirrors available on internal iPad storage with metadata
+// Lists all card mirrors available on internal local storage with metadata
 // (card name, camera model, image/video counts, total size). Tapping a
 // card navigates to its MediaGridView.
 //
@@ -39,7 +39,7 @@ struct CardPickerView: View {
                 .foregroundStyle(.secondary)
             Text("No files to browse")
                 .font(.headline)
-            Text("Backed-up cards will appear here once files are copied to iPad storage.")
+            Text("Backed-up cards will appear here once files are copied to local storage.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

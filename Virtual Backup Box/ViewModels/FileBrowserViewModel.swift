@@ -109,7 +109,7 @@ class FileBrowserViewModel {
     func deleteSelectedFiles() {
         for url in selectedURLs {
             // DELIBERATE EXCEPTION to read-only source rule (§2 of overall
-            // directive). Files being deleted here are on internal iPad storage
+            // directive). Files being deleted here are on internal local storage
             // (staging area only). Verified copies exist on external targets
             // per FileRecord entries in the database. Deletion is triggered
             // only by explicit user confirmation.

@@ -38,7 +38,7 @@ struct SessionDetailView: View {
             if session.sourceFilesDeleted {
                 Section {
                     Label(
-                        "Source files were removed from iPad storage after this backup.",
+                        "Source files were removed from local storage after this backup.",
                         systemImage: "trash"
                     )
                     .font(.subheadline)

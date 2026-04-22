@@ -140,7 +140,7 @@ extension SelectionViewModel {
         target.friendlyName = newName
     }
 
-    // MARK: - iPad Internal Storage Target
+    // MARK: - Local Internal Storage Target
 
     /// Whether an "VBB Internal Storage" target already exists in the database.
     var hasInternalStorageTarget: Bool {

@@ -3,7 +3,7 @@
 //
 // Wraps a completed CopySession and provides computed display strings for
 // the post-session results screen. Also manages the source cleanup offer
-// state (the "Remove from iPad?" flow after a 100% successful session).
+// state (the "Remove from local storage?" flow after a 100% successful session).
 //
 // This ViewModel reads from the CopySession and SessionViewModel but does
 // not modify the database except for the cleanup deletion.
@@ -69,27 +69,32 @@ class ResultsViewModel {
 
     // MARK: - Cleanup Eligibility
 
-    /// True if the source is internal iPad storage (not a camera card, not
-    /// external). Uses URLResourceKey.volumeIsInternalKey to determine this.
-    var sourceIsInternalStorage: Bool {
-        guard session.sourceCard == nil else { return false }
-        let url = URL(fileURLWithPath: session.sourcePath)
-        let values = try? url.resourceValues(forKeys: [.volumeIsInternalKey])
-        return values?.volumeIsInternal ?? false
+    /// True if the source is VBB Internal Storage — the app's own managed
+    /// staging area inside its Documents directory. Only this specific
+    /// location triggers the cleanup offer, not iCloud Drive or any other
+    /// "internal" volume. The intent: files were staged locally and have
+    /// now been backed up elsewhere, so the local copies can be removed.
+    var sourceIsVBBInternalStorage: Bool {
+        guard let docsURL = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        ).first else { return false }
+        let vbbPath = docsURL.appendingPathComponent("VBB Internal Storage").path
+        return session.sourcePath.hasPrefix(vbbPath)
     }
 
     /// True when the cleanup offer should be shown: 100% success, source
-    /// is internal storage, cleanup not already performed.
+    /// is VBB Internal Storage (not a card, not iCloud, not external),
+    /// and cleanup not already performed.
     var showCleanupOffer: Bool {
         session.status == .success
-            && sourceIsInternalStorage
+            && sourceIsVBBInternalStorage
             && !cleanupCompleted
             && !session.sourceFilesDeleted
     }
 
     // MARK: - Cleanup Action
 
-    /// Deletes the backed-up source files from internal iPad storage.
+    /// Deletes the backed-up source files from internal local storage.
     ///
     /// DELIBERATE EXCEPTION to read-only source rule (§2 of overall directive).
     /// This deletion is triggered only by explicit user confirmation after a
@@ -114,6 +119,6 @@ class ResultsViewModel {
 
         session.sourceFilesDeleted = true
         cleanupCompleted = true
-        cleanupMessage = "\(ByteCountFormatter.string(fromByteCount: deletedBytes, countStyle: .file)) removed from iPad storage."
+        cleanupMessage = "\(ByteCountFormatter.string(fromByteCount: deletedBytes, countStyle: .file)) removed from local storage."
     }
 }

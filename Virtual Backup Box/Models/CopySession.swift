@@ -69,7 +69,7 @@ final class CopySession {
     /// to a final value when the session ends.
     var status: SessionStatus
 
-    /// Whether source files were deleted from iPad storage after a successful
+    /// Whether source files were deleted from local storage after a successful
     /// session (Module 6 cleanup offer). Defaults to false.
     var sourceFilesDeleted: Bool
 

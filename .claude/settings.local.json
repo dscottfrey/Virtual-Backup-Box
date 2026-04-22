@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS\" -quiet build)",
+      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS\" build)"
+    ]
+  }
+}

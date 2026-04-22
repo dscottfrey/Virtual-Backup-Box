@@ -6,7 +6,7 @@
 // a clear, unambiguous account of what happened. This screen cannot be
 // skipped — the user must tap "Done" to acknowledge the result.
 //
-// For 100% successful sessions with internal iPad storage as the source,
+// For 100% successful sessions with internal local storage as the source,
 // includes the CleanupOfferView.
 
 import SwiftUI

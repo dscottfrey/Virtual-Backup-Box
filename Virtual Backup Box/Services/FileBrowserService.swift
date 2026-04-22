@@ -1,7 +1,7 @@
 // FileBrowserService.swift
 // Virtual Backup Box
 //
-// Builds the list of browsable card mirrors on internal iPad storage and
+// Builds the list of browsable card mirrors on internal local storage and
 // enumerates media files within them. Also handles file deletion for the
 // browse-and-cull workflow. This module never touches the backup engine.
 //
@@ -11,7 +11,7 @@
 import Foundation
 import SwiftData
 
-/// A card mirror folder found on internal iPad storage.
+/// A card mirror folder found on internal local storage.
 struct CardMirror: Identifiable, Sendable {
     let id: String
     let folderURL: URL
@@ -41,7 +41,7 @@ nonisolated enum FileBrowserService {
     /// Video file extensions supported in the browser.
     static let videoExtensions: Set<String> = ["MP4", "MOV"]
 
-    /// Finds all card mirror folders on internal iPad storage targets.
+    /// Finds all card mirror folders on internal local storage targets.
     /// Cross-references with KnownCard records for display names.
     static func findCardMirrors(context: ModelContext) -> [CardMirror] {
         let targetDescriptor = FetchDescriptor<KnownTarget>()
