@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS\" -quiet build)",
-      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS\" build)"
+      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS\" build)",
+      "Bash(sips -g pixelWidth -g pixelHeight -g hasAlpha -g format icon-source.png)",
+      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -list)",
+      "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -configuration Debug -destination \"generic/platform=iOS\" -quiet build)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
