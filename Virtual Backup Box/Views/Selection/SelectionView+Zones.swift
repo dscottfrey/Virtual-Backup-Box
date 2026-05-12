@@ -140,15 +140,30 @@ extension SelectionView {
         }
     }
 
-    /// Returns the KnownCard the user has chosen in the pulldown, or the
-    /// list's first entry when @State hasn't been set yet (initial render
-    /// or the previously selected UUID is no longer in the filtered list).
+    /// Returns the KnownCard the user has chosen in the pulldown.
+    ///
+    /// Default-selection order when the user hasn't picked anything yet:
+    ///   1. A card that is mounted right now AND has a bookmark — Select
+    ///      Previous can act on it immediately, which is what the user
+    ///      almost always wants when a known card is plugged in.
+    ///   2. The first card in the list (sorted by last-backup-date desc).
+    ///
+    /// Earlier version always returned knownCards.first. With a recent
+    /// unmounted card and an older mounted card, that left the user
+    /// looking at a disabled Select Previous and a misleading "not
+    /// plugged in" helper — even though a usable mounted card was one
+    /// pulldown-tap away (Scott 2026-05-12).
     private func currentlySelectedKnownCard(
         from knownCards: [KnownCard]
     ) -> KnownCard? {
         if let uuid = selectedKnownCardUUID,
            let match = knownCards.first(where: { $0.uuid == uuid }) {
             return match
+        }
+        if let mountedAndBookmarked = knownCards.first(where: {
+            $0.bookmarkData != nil && mountedCardUUIDs.contains($0.uuid)
+        }) {
+            return mountedAndBookmarked
         }
         return knownCards.first
     }
@@ -249,12 +264,15 @@ extension SelectionView {
                 }
             }
 
-            // Quick-select: known cards. The pulldown is hidden when the
-            // only known card is the active source (nothing to re-pick),
-            // but the action row is always shown so "Select New" is
-            // always reachable.
+            // Known cards picker — the full history view. Shows every
+            // KnownCard, including the currently-selected one, so the
+            // user can scan their whole card list at a glance. Earlier
+            // versions excluded the active card; that hid useful context
+            // when the user wanted to confirm what was already picked,
+            // and combined with a most-recent-wins default selection it
+            // could leave the picker showing only unmounted cards even
+            // though a mounted card was in the DB (Scott 2026-05-12).
             let knownCards = viewModel.recentKnownCards
-                .filter { $0.uuid != viewModel.selectedCard?.uuid }
             if !knownCards.isEmpty {
                 knownCardsPicker(knownCards: knownCards)
             }
