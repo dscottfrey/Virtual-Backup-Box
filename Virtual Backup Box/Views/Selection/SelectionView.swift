@@ -2,9 +2,9 @@
 // Virtual Backup Box
 //
 // The main screen of the app — the entry point for every backup session.
-// Shows two zones (Target and Source) and a "Start Backup" button that
-// activates once both are confirmed. Zone sub-views are in the extension
-// file SelectionView+Zones.swift.
+// Shows two zones (Target and Source) and a "Verify Backup Flow" button
+// that activates once both are confirmed. Zone sub-views are in the
+// extension file SelectionView+Zones.swift.
 //
 // This view contains only UI. All business logic lives in SelectionViewModel.
 
@@ -181,7 +181,7 @@ struct SelectionView: View {
         }
     }
 
-    // MARK: - Start Backup Button
+    // MARK: - Verify Backup Flow Button
 
     private var startBackupButton: some View {
         Button {
@@ -195,7 +195,7 @@ struct SelectionView: View {
             )
             navigateToScan = true
         } label: {
-            Text("Start Backup")
+            Text("Verify Backup Flow")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)

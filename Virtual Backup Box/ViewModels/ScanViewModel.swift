@@ -6,9 +6,9 @@
 // scan off the main thread via Task.detached, posting progress updates
 // back to the UI as files are enumerated.
 //
-// This ViewModel is created by SelectionView when "Start Backup" is tapped
-// and owns the scan lifecycle. The resulting ScanResult is passed forward
-// to Module 3 when the user confirms.
+// This ViewModel is created by SelectionView when "Verify Backup Flow"
+// is tapped and owns the scan lifecycle. The resulting ScanResult is
+// passed forward to Module 3 when the user confirms.
 
 import Foundation
 import SwiftData
