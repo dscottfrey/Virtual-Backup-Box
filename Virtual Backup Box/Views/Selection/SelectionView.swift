@@ -2,7 +2,7 @@
 // Virtual Backup Box
 //
 // The main screen of the app — the entry point for every backup session.
-// Shows two zones (Target and Source). Tapping "Verify Backup Flow" runs
+// Shows two zones (Source on top, Target below). Tapping "Verify Backup Flow" runs
 // the Module 2 scan inline below the zones (see InlineScanCard); tapping
 // "Start Copying" inside that card pushes to the live session page.
 //
@@ -35,9 +35,8 @@ struct SelectionView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    targetZone
-                    Divider()
                     sourceZone
+                    targetZone
                     if let scanVM = scanViewModel {
                         InlineScanCard(
                             viewModel: scanVM,
