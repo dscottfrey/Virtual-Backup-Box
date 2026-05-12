@@ -40,6 +40,13 @@ enum MountedVolumeService {
     /// Safe to call from any thread. Returns an empty set if iOS denies
     /// access to volume enumeration (extremely unlikely in our sandbox).
     static func mountedRemovableUUIDs() -> Set<String> {
+        // Dump *every* mounted volume the API returns, before any filter,
+        // so we can see in the iCloud debug log exactly what iOS exposes
+        // to the sandbox. The original filter (volumeIsRemovable /
+        // volumeIsEjectable) may be rejecting the card on iOS even though
+        // the Files app shows it — this log will confirm or rule that out.
+        dumpAllMountedVolumes()
+
         let urls = mountedRemovableURLs()
         var uuids: Set<String> = []
         for url in urls {
@@ -67,6 +74,36 @@ enum MountedVolumeService {
     }
 
     // MARK: - Private
+
+    /// Logs every mounted volume the API returns, with the resource-key
+    /// values we care about. Temporary diagnostic — used to confirm
+    /// whether iOS surfaces external camera cards to a sandboxed app via
+    /// mountedVolumeURLs at all. Remove once we know the answer.
+    private static func dumpAllMountedVolumes() {
+        let keys: [URLResourceKey] = [
+            .volumeNameKey,
+            .volumeUUIDStringKey,
+            .volumeIsRemovableKey,
+            .volumeIsEjectableKey,
+            .volumeIsLocalKey,
+            .volumeIsInternalKey,
+            .volumeIsBrowsableKey
+        ]
+        let urls = FileManager.default.mountedVolumeURLs(
+            includingResourceValuesForKeys: keys,
+            options: []
+        ) ?? []
+        DebugLogService.shared.log(
+            "[MountedCards] === volume dump (count=\(urls.count)) ==="
+        )
+        for url in urls {
+            let v = try? url.resourceValues(forKeys: Set(keys))
+            DebugLogService.shared.log(
+                "[MountedCards]   path=\(url.path) name=\(v?.volumeName ?? "?") uuid=\(v?.volumeUUIDString ?? "nil") removable=\(v?.volumeIsRemovable ?? false) ejectable=\(v?.volumeIsEjectable ?? false) local=\(v?.volumeIsLocal ?? false) internal=\(v?.volumeIsInternal ?? false) browsable=\(v?.volumeIsBrowsable ?? false)"
+            )
+        }
+        DebugLogService.shared.log("[MountedCards] === end dump ===")
+    }
 
     /// Enumerates mounted volumes and keeps only the removable/ejectable
     /// ones. See the file header for why this filter exists.
