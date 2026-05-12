@@ -134,8 +134,16 @@ struct SelectionView: View {
             // A summary built from the previous Source/Target shouldn't linger
             // once those inputs change. Easier (and safer) to clear and let
             // the user re-tap "Verify Backup Flow" than to keep a stale card.
-            .onChange(of: viewModel.sourceURL) { scanViewModel = nil }
-            .onChange(of: viewModel.activeTargetURL) { scanViewModel = nil }
+            // Logs are temporary — diagnosing a freeze on the card naming
+            // dialog Confirm button. Remove once the cause is found.
+            .onChange(of: viewModel.sourceURL) {
+                DebugLogService.shared.log("[onChange sourceURL] firing — clearing scanViewModel")
+                scanViewModel = nil
+            }
+            .onChange(of: viewModel.activeTargetURL) {
+                DebugLogService.shared.log("[onChange activeTargetURL] firing — clearing scanViewModel")
+                scanViewModel = nil
+            }
             .navigationDestination(isPresented: $navigateToSession) {
                 sessionDestinationView
             }

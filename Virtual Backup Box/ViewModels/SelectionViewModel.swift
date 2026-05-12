@@ -188,8 +188,16 @@ class SelectionViewModel {
     }
 
     /// Saves a new KnownCard after the user confirms the naming dialog.
+    /// Diagnostic logs around each step are intentional: a freeze was
+    /// reported on Confirm with the button stuck white. The logs let us
+    /// see in the iCloud debug log exactly which step (if any) hangs.
     func confirmCardName(friendlyName: String, cameraModel: String) {
-        guard let context = modelContext else { return }
+        DebugLogService.shared.log("[ConfirmCard] enter — name=\(friendlyName) model=\(cameraModel)")
+
+        guard let context = modelContext else {
+            DebugLogService.shared.log("[ConfirmCard] no modelContext — bailing")
+            return
+        }
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd"
@@ -201,11 +209,16 @@ class SelectionViewModel {
             cameraModel: cameraModel,
             destinationFolderName: folderName
         )
+        DebugLogService.shared.log("[ConfirmCard] about to insert card uuid=\(pendingCardUUID)")
         context.insert(card)
+        DebugLogService.shared.log("[ConfirmCard] inserted; setting selectedCard")
 
         selectedCard = card
+        DebugLogService.shared.log("[ConfirmCard] selectedCard set; setting sourceDisplayName")
         sourceDisplayName = friendlyName
+        DebugLogService.shared.log("[ConfirmCard] sourceDisplayName set; closing dialog")
         showCardNamingDialog = false
+        DebugLogService.shared.log("[ConfirmCard] exit")
     }
 
     /// Releases security-scoped access on the current source URL.

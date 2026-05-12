@@ -47,6 +47,10 @@ struct CardNamingDialog: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Confirm") {
+                        // Diagnostic log — see SelectionViewModel.confirmCardName
+                        // for the rest of the trail. Removing once the freeze
+                        // bug is resolved.
+                        DebugLogService.shared.log("[ConfirmCard] button tapped")
                         viewModel.confirmCardName(
                             friendlyName: friendlyName.trimmingCharacters(
                                 in: .whitespacesAndNewlines
@@ -55,6 +59,7 @@ struct CardNamingDialog: View {
                                 in: .whitespacesAndNewlines
                             )
                         )
+                        DebugLogService.shared.log("[ConfirmCard] button action returned")
                     }
                     .disabled(friendlyName.trimmingCharacters(
                         in: .whitespacesAndNewlines
