@@ -61,7 +61,7 @@ struct SelectionView: View {
                         Button {
                             FolderPickerView.clearBookmark()
                         } label: {
-                            Label("Reset Source Bookmark", systemImage: "arrow.uturn.backward")
+                            Label("Forget Last Source", systemImage: "arrow.uturn.backward")
                         }
                         Button(role: .destructive) {
                             showingResetConfirmation = true
