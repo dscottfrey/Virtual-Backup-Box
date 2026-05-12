@@ -228,6 +228,9 @@ enum BackupSessionService {
                     return true
 
                 case .failure:
+                    DebugLogService.shared.log(
+                        "[BackupSession] verify failed attempt \(attempt)/\(Constants.maxCopyRetries) for \(file.relativePath)"
+                    )
                     if attempt < Constants.maxCopyRetries {
                         try? await Task.sleep(for: .seconds(
                             Constants.retryDelaySeconds
@@ -235,7 +238,13 @@ enum BackupSessionService {
                     }
                 }
             } catch {
-                // Copy failed — retry after delay
+                // Catch was silent before 2026-05-12 — Scott hit a "Could
+                // not be backed up after 3 attempts" with no log line
+                // explaining which error fired. Logging the error type and
+                // URL is the minimum to diagnose the next failure.
+                DebugLogService.shared.log(
+                    "[BackupSession] copy failed attempt \(attempt)/\(Constants.maxCopyRetries) for \(file.relativePath): \(error) — source=\(file.url.path)"
+                )
                 if attempt < Constants.maxCopyRetries {
                     try? await Task.sleep(for: .seconds(
                         Constants.retryDelaySeconds

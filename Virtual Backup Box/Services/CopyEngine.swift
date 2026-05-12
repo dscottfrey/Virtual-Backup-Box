@@ -47,9 +47,23 @@ nonisolated enum CopyEngine {
         )
 
         guard let inputStream = InputStream(url: source) else {
+            // Most common cause: security-scoped access on the parent
+            // folder isn't active for THIS process at this moment.
+            // Logging the file's visibility from FileManager's POV tells
+            // us whether the file exists at all vs is hidden behind a
+            // sandbox boundary. Added 2026-05-12 after a "Could not be
+            // backed up" with zero diagnostic detail.
+            let exists = FileManager.default.fileExists(atPath: source.path)
+            let readable = FileManager.default.isReadableFile(atPath: source.path)
+            DebugLogService.shared.log(
+                "[CopyEngine] InputStream(url:) returned nil for \(source.path) — fileExists=\(exists) isReadable=\(readable)"
+            )
             throw CopyError.sourceReadFailed
         }
         guard let outputStream = OutputStream(url: destination, append: false) else {
+            DebugLogService.shared.log(
+                "[CopyEngine] OutputStream(url:) returned nil for \(destination.path)"
+            )
             throw CopyError.destinationWriteFailed
         }
 
@@ -76,7 +90,13 @@ nonisolated enum CopyEngine {
             if Task.isCancelled { throw CopyError.cancelled }
 
             let bytesRead = inputStream.read(buffer, maxLength: chunkSize)
-            if bytesRead < 0 { throw CopyError.sourceReadFailed }
+            if bytesRead < 0 {
+                let streamErr = inputStream.streamError?.localizedDescription ?? "nil"
+                DebugLogService.shared.log(
+                    "[CopyEngine] inputStream.read returned \(bytesRead) for \(source.path) at offset \(totalBytesWritten): \(streamErr)"
+                )
+                throw CopyError.sourceReadFailed
+            }
             if bytesRead == 0 { break }
 
             // Feed chunk to hasher
@@ -90,7 +110,13 @@ nonisolated enum CopyEngine {
                     buffer.advanced(by: offset),
                     maxLength: bytesRead - offset
                 )
-                if written < 0 { throw CopyError.destinationWriteFailed }
+                if written < 0 {
+                    let streamErr = outputStream.streamError?.localizedDescription ?? "nil"
+                    DebugLogService.shared.log(
+                        "[CopyEngine] outputStream.write returned \(written) for \(destination.path) at offset \(totalBytesWritten + Int64(offset)): \(streamErr)"
+                    )
+                    throw CopyError.destinationWriteFailed
+                }
                 offset += written
             }
 
