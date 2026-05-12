@@ -83,11 +83,17 @@ extension SelectionView {
                         .foregroundStyle(.secondary)
                 }
             } else if let card = viewModel.selectedCard {
+                // Card icon sits with the title so the visual cue lives
+                // on the most prominent line. The camera-model subhead
+                // and the "Known cards" duplicate entry for this same
+                // card were dropped — the friendly name already includes
+                // the camera model in the suggested format.
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(card.friendlyName).font(.title3)
-                    Text(card.cameraModel)
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
+                    HStack(spacing: 8) {
+                        Image(systemName: "sdcard")
+                            .foregroundStyle(.secondary)
+                        Text(card.friendlyName).font(.title3)
+                    }
                     if let lastBackup = card.lastBackupDate {
                         Text("Last backed up: \(lastBackup, format: .dateTime.month().day().hour().minute())")
                             .foregroundStyle(.secondary)
@@ -118,8 +124,11 @@ extension SelectionView {
                 }
             }
 
-            // Quick-select: known cards (need picker for iOS access)
+            // Quick-select: known cards (need picker for iOS access).
+            // Hide the currently selected card from this list — it's
+            // already shown above as the active source.
             let knownCards = viewModel.recentKnownCards
+                .filter { $0.uuid != viewModel.selectedCard?.uuid }
             if !knownCards.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Known cards (select via picker)")
