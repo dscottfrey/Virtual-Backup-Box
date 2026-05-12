@@ -243,6 +243,59 @@ class SelectionViewModel {
         }
     }
 
+    /// Confirms the currently-selected source still points at a reachable
+    /// volume AND, if it's a known card, that the volume UUID at the URL
+    /// still matches the selected card. Clears the source and returns
+    /// false otherwise. Safe to call when no source is selected.
+    ///
+    /// Why this matters — the card-swap scenario:
+    /// Scott reported (2026-05-12) that after picking a known card via
+    /// Select Previous, pulling the reader and inserting a different
+    /// card, the app continued to treat the old card as the active
+    /// source. The mount path embeds the volume UUID so the bookmark
+    /// for Card-A no longer resolves after Card-A is unplugged; but the
+    /// viewModel still holds Card-A's sourceURL/selectedCard. If files
+    /// existed on Card-B and the user tapped Verify in that state, the
+    /// scan would have attributed Card-B's files to Card-A's
+    /// destination folder — data integrity bug. This guard runs on
+    /// every mount-refresh and at scan start to make that impossible.
+    @discardableResult
+    func validateSourceStillValid() -> Bool {
+        guard let url = sourceURL else { return true }
+
+        let reachable = (try? url.checkResourceIsReachable()) ?? false
+        if !reachable {
+            DebugLogService.shared.log(
+                "[ValidateSource] sourceURL no longer reachable — clearing"
+            )
+            clearSource()
+            return false
+        }
+
+        if let card = selectedCard {
+            let currentUUID = CardDetectionService.readVolumeUUID(from: url)
+            if let uuid = currentUUID, uuid != card.uuid {
+                DebugLogService.shared.log(
+                    "[ValidateSource] UUID at sourceURL changed (\(card.uuid) → \(uuid)) — card was swapped, clearing"
+                )
+                clearSource()
+                return false
+            }
+        }
+
+        return true
+    }
+
+    /// Resets all source-related state. Used when validation finds the
+    /// source has gone away (card unplugged or swapped underneath us).
+    private func clearSource() {
+        stopSourceAccess()
+        sourceURL = nil
+        sourceDisplayName = ""
+        sourceIsCard = false
+        selectedCard = nil
+    }
+
     // MARK: - Private Helpers
 
     /// Captures a security-scoped bookmark for the picked URL and saves it

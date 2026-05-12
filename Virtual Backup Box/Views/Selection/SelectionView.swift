@@ -179,7 +179,19 @@ struct SelectionView: View {
     /// and kicks off the scan task. Triggered by the Verify Backup Flow
     /// button. Hand-off into the live session lives in
     /// SelectionView+SessionRoute.swift.
+    ///
+    /// Validates the source one more time at the moment of the tap. If
+    /// the card was pulled or swapped after Select Previous (and before
+    /// refreshMountedCards next ran), the source URL is stale. The
+    /// validator clears the source and returns false; we bail without
+    /// scanning. The Verify button will disable on the next render.
     private func startScan() {
+        guard viewModel.validateSourceStillValid() else {
+            DebugLogService.shared.log(
+                "[startScan] source no longer valid — aborting scan"
+            )
+            return
+        }
         let scanVM = ScanViewModel(
             sourceURL: viewModel.sourceURL!,
             targetURL: viewModel.activeTargetURL!,

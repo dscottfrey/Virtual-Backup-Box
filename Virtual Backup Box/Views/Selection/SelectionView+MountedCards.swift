@@ -36,10 +36,17 @@ extension SelectionView {
     /// every return to .active scenePhase, so plugging or unplugging a
     /// card while the app is in the foreground updates the UI on the next
     /// app activation.
+    ///
+    /// Also validates the currently-selected source still points at the
+    /// right card. If the user pulled the card and inserted a different
+    /// one, the source URL would still reference the old mount path and
+    /// the scan would attribute new files to the old card's destination.
+    /// validateSourceStillValid() catches that and clears the source.
     func refreshMountedCards() {
         mountedCardUUIDs = MountedVolumeService.mountedKnownCardUUIDs(
             in: modelContext
         )
+        viewModel.validateSourceStillValid()
     }
 
     /// Handles a tap on a "Choose Previous" row. Resolves the card's
