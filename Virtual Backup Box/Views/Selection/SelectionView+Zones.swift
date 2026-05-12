@@ -101,14 +101,23 @@ extension SelectionView {
 
     /// Bottom action row of the source zone: "Select Previous" (only
     /// shown when there are known cards other than the current source)
-    /// and "Select New" (always shown). Side by side so the user has a
-    /// clear binary choice — pick again from history, or pick fresh.
+    /// and "Select New" (always shown). Plain tappable text — no
+    /// .buttonStyle(.bordered), which on iOS 26 renders as large liquid-
+    /// glass pills that overwhelm the source-zone card. Plain text
+    /// buttons get the default borderless tinted style — blue and
+    /// readable, with the icon as the visual anchor.
+    ///
+    /// Both taps log on entry so the iCloud debug log can tell us if a
+    /// reported "button never becomes active" is a UI/hit-target issue
+    /// (no log line means tap was never received) versus state
+    /// propagation (log line fires but the sheet still doesn't appear).
     @ViewBuilder
     func sourceActionButtons(knownCards: [KnownCard]) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 20) {
             if !knownCards.isEmpty {
                 let canSelect = canSelectPreviousCard(from: knownCards)
                 Button {
+                    DebugLogService.shared.log("[SelectPrevious] tapped")
                     if let card = currentlySelectedKnownCard(from: knownCards) {
                         chooseKnownCard(card)
                     }
@@ -116,17 +125,16 @@ extension SelectionView {
                     Label("Select Previous", systemImage: "arrow.uturn.backward")
                         .font(.subheadline)
                 }
-                .buttonStyle(.bordered)
                 .disabled(!canSelect)
             }
 
             Button {
+                DebugLogService.shared.log("[SelectNew] tapped — setting showingSourcePicker=true")
                 viewModel.showingSourcePicker = true
             } label: {
                 Label("Select New", systemImage: "folder")
                     .font(.subheadline)
             }
-            .buttonStyle(.bordered)
 
             Spacer()
         }
