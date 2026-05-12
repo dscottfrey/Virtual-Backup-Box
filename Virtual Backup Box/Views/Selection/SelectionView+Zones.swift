@@ -48,13 +48,38 @@ extension SelectionView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// One row in the "Known cards" list. Mounted cards render as a blue
-    /// tappable Button (label: "Choose Previous"); not-mounted cards
-    /// render as gray text. See the source-zone comment for why we keep
-    /// the non-actionable row instead of hiding it.
+    /// One row in the "Known cards" list. Three visual states that map
+    /// directly to what iOS will and won't let us do with this card:
+    ///
+    ///  1. Mounted right now AND a bookmark is stored on the card → blue,
+    ///     tappable "Choose Previous" Button. One tap re-selects the card
+    ///     as the source with no picker, by resolving the stored
+    ///     security-scoped bookmark.
+    ///
+    ///  2. Bookmark stored but not mounted right now → gray with
+    ///     "Not plugged in" subtext. We know the card exists and we have
+    ///     the means to one-tap it, but it isn't here. Inert by design.
+    ///
+    ///  3. No bookmark stored yet (legacy cards from before the bookmark
+    ///     property existed, or a card whose bookmark went stale and was
+    ///     cleared) → gray with "Pick once to enable quick-select"
+    ///     subtext. The user has to do one normal "Select Source" pick of
+    ///     this card; that pick captures a bookmark and from then on the
+    ///     row moves into state 1 or 2.
+    ///
+    /// Why we keep states 2 and 3 visible instead of hiding them:
+    /// CLAUDE.md and Scott's UX brief — the app should explain what the
+    /// user CAN do and why something isn't doing what they expect. Hiding
+    /// a known card just because it isn't plugged in would lose the
+    /// guidance, and silently showing a tappable row that doesn't work
+    /// would be the original "misleading and confusing" complaint.
     @ViewBuilder
     func knownCardRow(for card: KnownCard) -> some View {
-        if mountedCardUUIDs.contains(card.uuid) {
+        let hasBookmark = card.bookmarkData != nil
+        let isMounted = mountedCardUUIDs.contains(card.uuid)
+
+        if isMounted && hasBookmark {
+            // State 1: blue tappable
             Button {
                 chooseKnownCard(card)
             } label: {
@@ -69,16 +94,25 @@ extension SelectionView {
                 .contentShape(Rectangle())
             }
         } else {
-            HStack(spacing: 6) {
-                Image(systemName: "sdcard")
-                    .foregroundStyle(.secondary)
-                Text(card.friendlyName)
-                if let date = card.lastBackupDate {
-                    Spacer()
-                    Text(date, format: .dateTime.month().day())
+            // States 2 & 3: gray, inert, with a guidance subtitle.
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sdcard")
+                    Text(card.friendlyName)
+                    if let date = card.lastBackupDate {
+                        Spacer()
+                        Text(date, format: .dateTime.month().day())
+                    }
                 }
+                .font(.subheadline)
+
+                Text(
+                    hasBookmark
+                        ? "Not plugged in"
+                        : "Pick once via Select Source to enable quick-select"
+                )
+                .font(.caption)
             }
-            .font(.subheadline)
             .foregroundStyle(.secondary)
         }
     }

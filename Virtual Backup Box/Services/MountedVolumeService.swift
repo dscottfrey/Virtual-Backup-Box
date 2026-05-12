@@ -1,132 +1,120 @@
 // MountedVolumeService.swift
 // Virtual Backup Box
 //
-// Reports which removable volumes are currently mounted, keyed by their
-// filesystem UUID. Used by the main screen to detect that a previously
-// seen camera card is plugged in *right now*, so the "Known cards" list
-// entry for it can become a tappable "Choose Previous" action instead of
-// gray informational text.
+// Detects which known camera cards are currently mounted by resolving each
+// KnownCard's saved security-scoped bookmark. Used by the main screen to
+// decide which "Known cards" rows are one-tap selectable.
 //
-// Why this is needed:
-// On iOS, the file picker is the only path to actually open a folder on a
-// removable volume — security-scoped bookmarks aside, the user must consent
-// via the system picker. So even when we know a card is mounted, we still
-// have to bounce through the picker. But we can absolutely *detect* that
-// it's mounted, and that lets us:
-//   1. Color the "Known cards" line as actionable instead of gray
-//   2. Pre-navigate the picker to that card's volume root, so the user
-//      just taps "Open"
-// (The full "skip the picker entirely" version requires a per-card
-// security-scoped bookmark stored on KnownCard — see handoff.md item #15.)
+// History — why we don't use FileManager.mountedVolumeURLs:
+// The first version of this service used FileManager.mountedVolumeURLs
+// with a removable/ejectable filter. It returned an empty array on iOS
+// even with a camera card visibly mounted in the system Files app
+// (debug log dump on 2026-05-12 showed count=0 while a card was actively
+// picked via the picker). iOS does not surface external removable volumes
+// to a sandboxed third-party app through that API — only the system Files
+// app / UIDocumentPicker has visibility. So that approach is dead. The
+// bookmark approach is the only sandbox-safe way to know whether a
+// previously-seen card is plugged in right now.
 //
-// Implementation notes — what failed first and why this approach works:
-// First attempt was FileManager.default.mountedVolumeURLs(...) with no
-// options. That returns *all* mounted volumes including iCloud Drive,
-// On My iPhone, and synthetic Apple containers. We filter with
-// .skipHiddenVolumes and additionally require the volume to be marked as
-// removable or ejectable via URLResourceKey, because camera cards always
-// report at least one of those keys as true. iCloud Drive / On My iPhone
-// do not. This filter matches what the Files app surfaces under "Locations
-// > External."
+// How the bookmark resolution doubles as both detection AND access:
+// A security-scoped bookmark stored at first-pick time both (a) survives
+// app restarts and (b) when resolved, can be combined with
+// startAccessingSecurityScopedResource() to regain sandbox access without
+// re-presenting the picker. So a single bookmark resolution per card
+// answers "is it mounted?" and "can I open it directly?" with one call.
+//
+// Limitation:
+// A KnownCard that has never been picked since the bookmarkData property
+// was introduced has no bookmark and cannot be detected. The UI shows
+// those cards as "Not yet saved" and guides the user to do one normal
+// "Select Source" pick to enable quick-select. After that, the card is
+// one-tap forever (until the bookmark goes stale, which is auto-refreshed
+// on each successful resolution).
 
 import Foundation
+import SwiftData
 
 enum MountedVolumeService {
 
-    /// Returns the set of filesystem UUIDs for all currently-mounted
-    /// removable volumes (camera cards, USB sticks, SD readers, etc.).
-    /// Excludes iCloud Drive, On My iPhone, and other built-in providers.
-    ///
-    /// Safe to call from any thread. Returns an empty set if iOS denies
-    /// access to volume enumeration (extremely unlikely in our sandbox).
-    static func mountedRemovableUUIDs() -> Set<String> {
-        // Dump *every* mounted volume the API returns, before any filter,
-        // so we can see in the iCloud debug log exactly what iOS exposes
-        // to the sandbox. The original filter (volumeIsRemovable /
-        // volumeIsEjectable) may be rejecting the card on iOS even though
-        // the Files app shows it — this log will confirm or rule that out.
-        dumpAllMountedVolumes()
-
-        let urls = mountedRemovableURLs()
-        var uuids: Set<String> = []
-        for url in urls {
-            if let values = try? url.resourceValues(
-                forKeys: [.volumeUUIDStringKey]
-            ), let uuid = values.volumeUUIDString {
-                uuids.insert(uuid)
-            }
-        }
-        return uuids
+    /// Result of resolving one card's bookmark. Carries both whether the
+    /// card is reachable right now and (if so) the live URL so the caller
+    /// can immediately use it without resolving the bookmark twice.
+    struct Resolution {
+        let isMounted: Bool
+        let url: URL?
     }
 
-    /// Returns the URL of the mounted volume root for a given UUID, or nil
-    /// if no removable volume with that UUID is currently mounted. Used by
-    /// the picker pre-navigation path.
-    static func mountedURL(forUUID uuid: String) -> URL? {
-        for url in mountedRemovableURLs() {
-            if let values = try? url.resourceValues(
-                forKeys: [.volumeUUIDStringKey]
-            ), values.volumeUUIDString == uuid {
-                return url
+    /// Returns the set of KnownCard UUIDs whose saved bookmark resolves to
+    /// a currently-reachable URL — i.e. cards that are plugged in *right
+    /// now*. Cards without a bookmark, or whose bookmark fails to resolve,
+    /// are not included.
+    static func mountedKnownCardUUIDs(in context: ModelContext) -> Set<String> {
+        let descriptor = FetchDescriptor<KnownCard>()
+        guard let cards = try? context.fetch(descriptor) else { return [] }
+
+        var mounted: Set<String> = []
+        for card in cards {
+            if resolve(card: card).isMounted {
+                mounted.insert(card.uuid)
             }
         }
-        return nil
-    }
-
-    // MARK: - Private
-
-    /// Logs every mounted volume the API returns, with the resource-key
-    /// values we care about. Temporary diagnostic — used to confirm
-    /// whether iOS surfaces external camera cards to a sandboxed app via
-    /// mountedVolumeURLs at all. Remove once we know the answer.
-    private static func dumpAllMountedVolumes() {
-        let keys: [URLResourceKey] = [
-            .volumeNameKey,
-            .volumeUUIDStringKey,
-            .volumeIsRemovableKey,
-            .volumeIsEjectableKey,
-            .volumeIsLocalKey,
-            .volumeIsInternalKey,
-            .volumeIsBrowsableKey
-        ]
-        let urls = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: keys,
-            options: []
-        ) ?? []
         DebugLogService.shared.log(
-            "[MountedCards] === volume dump (count=\(urls.count)) ==="
+            "[MountedCards] resolved \(cards.count) known card(s), \(mounted.count) mounted"
         )
-        for url in urls {
-            let v = try? url.resourceValues(forKeys: Set(keys))
-            DebugLogService.shared.log(
-                "[MountedCards]   path=\(url.path) name=\(v?.volumeName ?? "?") uuid=\(v?.volumeUUIDString ?? "nil") removable=\(v?.volumeIsRemovable ?? false) ejectable=\(v?.volumeIsEjectable ?? false) local=\(v?.volumeIsLocal ?? false) internal=\(v?.volumeIsInternal ?? false) browsable=\(v?.volumeIsBrowsable ?? false)"
-            )
-        }
-        DebugLogService.shared.log("[MountedCards] === end dump ===")
+        return mounted
     }
 
-    /// Enumerates mounted volumes and keeps only the removable/ejectable
-    /// ones. See the file header for why this filter exists.
-    private static func mountedRemovableURLs() -> [URL] {
-        let keys: [URLResourceKey] = [
-            .volumeUUIDStringKey,
-            .volumeIsRemovableKey,
-            .volumeIsEjectableKey
-        ]
-        guard let urls = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: keys,
-            options: [.skipHiddenVolumes]
+    /// Resolves a single card's bookmark and returns whether it is mounted
+    /// plus the live URL. Refreshes a stale bookmark in place. Clears the
+    /// bookmark on the card if it fails to resolve at all.
+    ///
+    /// Caller is responsible for startAccessingSecurityScopedResource() on
+    /// the returned URL before reading from it — resolution alone does not
+    /// start access.
+    static func resolve(card: KnownCard) -> Resolution {
+        guard let data = card.bookmarkData else {
+            return Resolution(isMounted: false, url: nil)
+        }
+
+        var isStale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: data,
+            options: [],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
         ) else {
-            return []
+            DebugLogService.shared.log(
+                "[MountedCards] bookmark for \(card.friendlyName) failed to resolve — clearing"
+            )
+            card.bookmarkData = nil
+            return Resolution(isMounted: false, url: nil)
         }
-        return urls.filter { url in
-            guard let values = try? url.resourceValues(
-                forKeys: [.volumeIsRemovableKey, .volumeIsEjectableKey]
-            ) else {
-                return false
+
+        // Refresh stale bookmark silently so the next resolution is clean.
+        if isStale {
+            if let refreshed = try? url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            ) {
+                card.bookmarkData = refreshed
+                DebugLogService.shared.log(
+                    "[MountedCards] refreshed stale bookmark for \(card.friendlyName)"
+                )
             }
-            return (values.volumeIsRemovable ?? false)
-                || (values.volumeIsEjectable ?? false)
         }
+
+        // A bookmark can resolve to a URL even when the volume is gone —
+        // the URL exists but the path is unreachable. checkResourceIsReachable
+        // is the authoritative "is this here right now?" check.
+        let reachable = (try? url.checkResourceIsReachable()) ?? false
+        if !reachable {
+            DebugLogService.shared.log(
+                "[MountedCards] bookmark for \(card.friendlyName) resolved but not reachable"
+            )
+            return Resolution(isMounted: false, url: nil)
+        }
+
+        return Resolution(isMounted: true, url: url)
     }
 }

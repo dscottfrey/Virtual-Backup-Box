@@ -60,6 +60,30 @@ final class KnownCard {
     /// Updated by BackupSessionService (Module 3) at the end of each session.
     var lastBackupDate: Date?
 
+    /// Security-scoped bookmark to the folder the user picked when this card
+    /// was last used as a source. Nil for cards that haven't been picked
+    /// since this property was introduced (they need one more normal pick
+    /// to populate it).
+    ///
+    /// Why this is on KnownCard:
+    /// iOS does not surface external camera-card volumes to a sandboxed app
+    /// via FileManager.mountedVolumeURLs — confirmed by debug log: an
+    /// unfiltered dump returned count=0 even with the card visibly mounted
+    /// in the system Files app. So we cannot ask the OS "is this card
+    /// plugged in?" The only sanctioned path that survives the sandbox is
+    /// a security-scoped bookmark previously consented to via the file
+    /// picker. Resolving the bookmark and calling checkResourceIsReachable()
+    /// tells us whether the card is currently mounted, AND a successful
+    /// resolution lets us re-acquire sandbox access without re-presenting
+    /// the picker — a one-tap re-selection of a known card.
+    ///
+    /// Why optional and not migrated: existing KnownCard rows from before
+    /// this property existed simply have nil. The next normal pick of that
+    /// card saves a bookmark and the card becomes one-tap from then on.
+    /// Cheaper than writing migration code and matches how the global
+    /// last-source bookmark already evolves silently.
+    var bookmarkData: Data?
+
     // MARK: - Relationships
 
     /// All backup sessions involving this card as source.

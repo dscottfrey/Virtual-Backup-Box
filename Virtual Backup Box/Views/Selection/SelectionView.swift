@@ -32,15 +32,12 @@ struct SelectionView: View {
     @State var sessionViewModel: SessionViewModel?
     @State var navigateToSession = false
 
-    /// Volume UUIDs of removable volumes mounted right now. Populated by
-    /// SelectionView+MountedCards.refreshMountedCards(). Used by the
-    /// source zone to decide which "Known cards" rows are actionable.
+    /// UUIDs of KnownCards whose stored bookmark resolves to a reachable
+    /// URL right now — i.e. cards plugged in *and* with sandbox access
+    /// already granted. Populated by
+    /// SelectionView+MountedCards.refreshMountedCards(). Drives the
+    /// "Choose Previous" tappable rows in the source zone.
     @State var mountedCardUUIDs: Set<String> = []
-
-    /// Optional hint passed to FolderPickerView when the user tapped a
-    /// known card. Tells the picker to open at that card's volume root
-    /// instead of using the global last-source bookmark.
-    @State var preferredSourcePickerURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -112,11 +109,7 @@ struct SelectionView: View {
                 // flip between actionable and gray immediately.
                 if newPhase == .active { refreshMountedCards() }
             }
-            .sheet(isPresented: $viewModel.showingSourcePicker, onDismiss: {
-                // Clear the one-shot hint so a subsequent "Select Source"
-                // tap falls back to the saved bookmark, not a stale hint.
-                preferredSourcePickerURL = nil
-            }) {
+            .sheet(isPresented: $viewModel.showingSourcePicker) {
                 FolderPickerView(
                     onPicked: { url in
                         viewModel.showingSourcePicker = false
@@ -124,8 +117,7 @@ struct SelectionView: View {
                     },
                     onCancelled: {
                         viewModel.showingSourcePicker = false
-                    },
-                    preferredStartURL: preferredSourcePickerURL
+                    }
                 )
             }
             .sheet(isPresented: $viewModel.showCardNamingDialog) {

@@ -169,10 +169,16 @@ class SelectionViewModel {
 
         sourceIsCard = true
 
-        // Known card — show name, skip the naming dialog
+        // Known card — show name, skip the naming dialog. Refresh the
+        // per-card bookmark so the next session can detect the card as
+        // mounted and skip the picker entirely. We do this on every
+        // successful pick (not just first-pick) because bookmarks can
+        // go stale and re-picking is the moment we have a guaranteed
+        // valid one.
         if let knownCard = lookupCard(uuid: uuid) {
             selectedCard = knownCard
             sourceDisplayName = knownCard.friendlyName
+            saveBookmark(for: url, on: knownCard)
             return
         }
 
@@ -213,6 +219,14 @@ class SelectionViewModel {
         context.insert(card)
         DebugLogService.shared.log("[ConfirmCard] inserted; setting selectedCard")
 
+        // Capture the per-card bookmark now, while the user-granted
+        // security-scoped access from handleSourceSelected is still live.
+        // This is what powers one-tap re-selection from the source zone
+        // on every subsequent insertion of this card.
+        if let url = sourceURL {
+            saveBookmark(for: url, on: card)
+        }
+
         selectedCard = card
         DebugLogService.shared.log("[ConfirmCard] selectedCard set; setting sourceDisplayName")
         sourceDisplayName = friendlyName
@@ -230,6 +244,30 @@ class SelectionViewModel {
     }
 
     // MARK: - Private Helpers
+
+    /// Captures a security-scoped bookmark for the picked URL and saves it
+    /// onto the KnownCard. Used to power "Choose Previous" — on the next
+    /// app launch, resolving this bookmark tells us whether the card is
+    /// mounted AND gives us sandbox access without re-presenting the
+    /// picker. Failures are logged but non-fatal: the card still works as
+    /// a source via the normal picker.
+    private func saveBookmark(for url: URL, on card: KnownCard) {
+        do {
+            let data = try url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            card.bookmarkData = data
+            DebugLogService.shared.log(
+                "[KnownCardBookmark] saved bookmark for \(card.friendlyName)"
+            )
+        } catch {
+            DebugLogService.shared.log(
+                "[KnownCardBookmark] failed to save bookmark for \(card.friendlyName): \(error)"
+            )
+        }
+    }
 
     /// Looks up a KnownCard by volume UUID.
     private func lookupCard(uuid: String) -> KnownCard? {

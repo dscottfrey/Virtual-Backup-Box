@@ -1,54 +1,69 @@
 // SelectionView+MountedCards.swift
 // Virtual Backup Box
 //
-// Extension on SelectionView that handles the "is a known card mounted
-// right now?" check. When a known card is mounted, the source zone shows
-// it as a tappable "Choose Previous" line (instead of gray informational
-// text), and tapping it opens the file picker pre-navigated to that
-// card's volume root — saving the user a couple of taps inside the
-// system picker.
+// Extension on SelectionView that detects which known cards are mounted
+// right now and handles the one-tap "Choose Previous" action.
+//
+// How detection works (and what failed first):
+// First attempt used FileManager.mountedVolumeURLs to enumerate plugged-in
+// removable volumes. That returned an empty array on iOS even when a card
+// was visibly mounted in the system Files app (debug dump on 2026-05-12,
+// see commit 67ff1e2). iOS does not expose external camera-card volumes
+// to a sandboxed app via that API — only the system Files app /
+// UIDocumentPicker has visibility. So detection had to move elsewhere.
+//
+// The current approach: each KnownCard stores a security-scoped bookmark
+// captured the last time the user picked that card via the file picker.
+// On screen appear (and on scenePhase → .active), we resolve each
+// bookmark; a successful resolution with checkResourceIsReachable() == true
+// means the card is plugged in *and* we have sandbox access to use. That
+// answers both questions ("is it mounted?" and "can I open it?") in one
+// call — which is what powers one-tap re-selection.
 //
 // Why this is in its own file:
 // SelectionView.swift is the screen's navigation coordinator and is
-// already close to the §6.3 ~200-line cap. The mount-detection logic is
-// orthogonal to navigation, so it lives here. The view's @State
-// properties for `mountedCardUUIDs` and `preferredSourcePickerURL` must
-// still be declared on the main struct (SwiftUI requires @State on the
-// type itself, not extensions), but the supporting methods belong here.
-//
-// Why we don't fully skip the picker:
-// iOS sandbox requires user consent via the picker for removable volume
-// access. Detecting the mount and pre-navigating the picker is the most
-// we can do without storing a security-scoped bookmark on each KnownCard.
-// That follow-up (handoff.md item #15) would skip the picker entirely.
+// already close to the §6.3 ~200-line cap. Mount-detection is orthogonal
+// to navigation, so it lives here. The @State properties for the mounted
+// set must still be declared on the main struct (SwiftUI requires @State
+// on the type itself, not extensions); the supporting methods belong here.
 
 import SwiftUI
 
 extension SelectionView {
 
-    /// Refreshes the set of currently-mounted removable volume UUIDs.
-    /// Called on first appearance and whenever the app becomes active
-    /// again, so plugging in or ejecting a card while the screen is
-    /// already showing immediately updates the UI.
+    /// Refreshes the set of mounted-known-card UUIDs by resolving every
+    /// KnownCard's stored bookmark. Called on first appearance and on
+    /// every return to .active scenePhase, so plugging or unplugging a
+    /// card while the app is in the foreground updates the UI on the next
+    /// app activation.
     func refreshMountedCards() {
-        mountedCardUUIDs = MountedVolumeService.mountedRemovableUUIDs()
-        DebugLogService.shared.log(
-            "[MountedCards] refreshed — \(mountedCardUUIDs.count) removable volume(s)"
+        mountedCardUUIDs = MountedVolumeService.mountedKnownCardUUIDs(
+            in: modelContext
         )
     }
 
-    /// Handles a tap on a known card in the source zone. Looks up the
-    /// card's current mount point and presents the picker pre-navigated
-    /// to that volume root. The user still has to tap "Open" to grant
-    /// sandbox access — that's an iOS constraint, not something we can
-    /// work around without per-card bookmarks.
+    /// Handles a tap on a "Choose Previous" row. Resolves the card's
+    /// security-scoped bookmark and feeds the resulting URL straight into
+    /// the normal source-selection pipeline — no picker is presented.
+    ///
+    /// If the bookmark fails to resolve at the moment of the tap (e.g.
+    /// the card was unplugged between the screen rendering and the tap),
+    /// we fall back to the normal picker so the user is never stranded.
     func chooseKnownCard(_ card: KnownCard) {
-        preferredSourcePickerURL = MountedVolumeService.mountedURL(
-            forUUID: card.uuid
-        )
+        let resolution = MountedVolumeService.resolve(card: card)
+        guard let url = resolution.url, resolution.isMounted else {
+            DebugLogService.shared.log(
+                "[MountedCards] choose \(card.friendlyName) — bookmark stale at tap time; falling back to picker"
+            )
+            // Drop this card from the mounted set so the row goes gray
+            // on the very next layout pass, and open the picker.
+            mountedCardUUIDs.remove(card.uuid)
+            viewModel.showingSourcePicker = true
+            return
+        }
         DebugLogService.shared.log(
-            "[MountedCards] choosing known card \(card.friendlyName) — preferredURL=\(preferredSourcePickerURL?.path ?? "nil")"
+            "[MountedCards] choose \(card.friendlyName) — skipping picker, using bookmark URL"
         )
-        viewModel.showingSourcePicker = true
+        Task { await viewModel.handleSourceSelected(url: url) }
     }
 }
