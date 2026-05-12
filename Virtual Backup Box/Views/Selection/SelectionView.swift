@@ -2,9 +2,15 @@
 // Virtual Backup Box
 //
 // The main screen of the app — the entry point for every backup session.
-// Shows two zones (Target and Source) and a "Verify Backup Flow" button
-// that activates once both are confirmed. Zone sub-views are in the
-// extension file SelectionView+Zones.swift.
+// Shows two zones (Target and Source). Tapping "Verify Backup Flow" runs
+// the Module 2 scan inline below the zones (see InlineScanCard); tapping
+// "Start Copying" inside that card pushes to the live session page.
+//
+// Why inline-scan instead of pushing a separate "Scan Complete" page:
+// the user shouldn't lose sight of which Source and Target a scan is
+// reporting on. The previous flow added a middle page that was little
+// more than "tap to confirm" — folding it into the main screen removes
+// the navigation step without losing any information.
 //
 // This view contains only UI. All business logic lives in SelectionViewModel.
 
@@ -22,20 +28,33 @@ struct SelectionView: View {
     @State var showingResetConfirmation = false
     @State var showingSettings = false
     @State var scanViewModel: ScanViewModel?
-    @State var navigateToScan = false
     @State var sessionViewModel: SessionViewModel?
     @State var navigateToSession = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                targetZone
-                Divider()
-                sourceZone
-                Spacer()
-                startBackupButton
+            ScrollView {
+                VStack(spacing: 24) {
+                    targetZone
+                    Divider()
+                    sourceZone
+                    if let scanVM = scanViewModel {
+                        InlineScanCard(
+                            viewModel: scanVM,
+                            onStartCopying: { startCopying(scanVM: scanVM) },
+                            onDismiss: { scanViewModel = nil }
+                        )
+                    }
+                }
+                .padding()
             }
-            .padding()
+            .safeAreaInset(edge: .bottom) {
+                if scanViewModel == nil {
+                    startBackupButton
+                        .padding()
+                        .background(.bar)
+                }
+            }
             .navigationTitle("Virtual Backup Box")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -112,88 +131,41 @@ struct SelectionView: View {
             } message: {
                 Text("This deletes all backup history, file records, known cards, and known targets from the database. Files on disk are not affected. The app will behave as if freshly installed.")
             }
-            .navigationDestination(isPresented: $navigateToScan) {
-                if let scanVM = scanViewModel {
-                    scanFlowView(scanVM)
-                }
-            }
+            // A summary built from the previous Source/Target shouldn't linger
+            // once those inputs change. Easier (and safer) to clear and let
+            // the user re-tap "Verify Backup Flow" than to keep a stale card.
+            .onChange(of: viewModel.sourceURL) { scanViewModel = nil }
+            .onChange(of: viewModel.activeTargetURL) { scanViewModel = nil }
             .navigationDestination(isPresented: $navigateToSession) {
                 sessionDestinationView
             }
         }
     }
 
-    // MARK: - Scan Flow
+    // MARK: - Start Scan
 
-    @ViewBuilder
-    private func scanFlowView(_ scanVM: ScanViewModel) -> some View {
-        if let result = scanVM.scanResult {
-            ScanSummaryView(
-                result: result,
-                availableSpaceBytes: scanVM.availableSpaceBytes,
-                onStartBackup: {
-                    let sessionVM = SessionViewModel()
-                    sessionVM.targetName = viewModel.activeTarget?.friendlyName ?? ""
-                    sessionVM.startSession(
-                        scanResult: result,
-                        selectedCard: scanVM.selectedCard,
-                        modelContext: modelContext
-                    )
-                    sessionViewModel = sessionVM
-                    navigateToSession = true
-                },
-                onCancel: { navigateToScan = false }
-            )
-        } else {
-            ScanProgressView(viewModel: scanVM)
-                .task { await scanVM.startScan() }
-        }
-    }
-
-    // MARK: - Session Destination
-
-    @ViewBuilder
-    private var sessionDestinationView: some View {
-        if let sessionVM = sessionViewModel {
-            if sessionVM.isSessionComplete,
-               let session = sessionVM.completedSession {
-                SessionResultsView(
-                    viewModel: ResultsViewModel(
-                        session: session,
-                        failedFiles: sessionVM.failedFiles,
-                        targetName: sessionVM.targetName,
-                        modelContext: modelContext
-                    ),
-                    onDone: {
-                        navigateToSession = false
-                        navigateToScan = false
-                    }
-                )
-            } else {
-                SessionProgressView(viewModel: sessionVM,
-                    onSessionComplete: { },
-                    onCancel: {
-                        navigateToSession = false
-                        navigateToScan = false
-                    }
-                )
-            }
-        }
+    /// Builds a fresh ScanViewModel, stores it so InlineScanCard appears,
+    /// and kicks off the scan task. Triggered by the Verify Backup Flow
+    /// button. Hand-off into the live session lives in
+    /// SelectionView+SessionRoute.swift.
+    private func startScan() {
+        let scanVM = ScanViewModel(
+            sourceURL: viewModel.sourceURL!,
+            targetURL: viewModel.activeTargetURL!,
+            sessionFolderName: viewModel.sessionFolderName,
+            cameraModel: viewModel.selectedCard?.cameraModel,
+            selectedCard: viewModel.selectedCard,
+            modelContext: modelContext
+        )
+        scanViewModel = scanVM
+        Task { await scanVM.startScan() }
     }
 
     // MARK: - Verify Backup Flow Button
 
     private var startBackupButton: some View {
         Button {
-            scanViewModel = ScanViewModel(
-                sourceURL: viewModel.sourceURL!,
-                targetURL: viewModel.activeTargetURL!,
-                sessionFolderName: viewModel.sessionFolderName,
-                cameraModel: viewModel.selectedCard?.cameraModel,
-                selectedCard: viewModel.selectedCard,
-                modelContext: modelContext
-            )
-            navigateToScan = true
+            startScan()
         } label: {
             Text("Verify Backup Flow")
                 .font(.title3)
@@ -207,29 +179,11 @@ struct SelectionView: View {
 
     // MARK: - Reset Database
 
-    /// Deletes all SwiftData records (sessions, file records, known cards,
-    /// known targets). Files on disk are not affected. The app returns to
-    /// a fresh-install state. Useful for clearing stale records during
-    /// development or after a schema change.
+    /// Wraps the ViewModel's resetDatabase so the view can also clear its
+    /// own scan-card state in a single call site.
     private func resetDatabase() {
-        let context = modelContext
-        let sessions = (try? context.fetch(FetchDescriptor<CopySession>())) ?? []
-        for s in sessions { context.delete(s) }
-        let cards = (try? context.fetch(FetchDescriptor<KnownCard>())) ?? []
-        for c in cards { context.delete(c) }
-        let targets = (try? context.fetch(FetchDescriptor<KnownTarget>())) ?? []
-        for t in targets { context.delete(t) }
-        let records = (try? context.fetch(FetchDescriptor<FileRecord>())) ?? []
-        for r in records { context.delete(r) }
-
-        // Reset ViewModel state
-        viewModel.activeTarget = nil
-        viewModel.activeTargetURL = nil
-        viewModel.availableSpaceBytes = nil
-        viewModel.sourceURL = nil
-        viewModel.selectedCard = nil
-        viewModel.sourceDisplayName = ""
-        viewModel.resolveKnownTargets()
+        viewModel.resetDatabase()
+        scanViewModel = nil
     }
 }
 
