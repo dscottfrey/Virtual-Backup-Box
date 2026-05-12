@@ -2,14 +2,21 @@
 // Virtual Backup Box
 //
 // UIViewControllerRepresentable wrapper around UIDocumentPickerViewController
-// for folder selection. Uses a two-layer strategy to control where the
+// for folder selection. Uses a three-layer strategy to control where the
 // picker opens:
 //
-// Layer 1 (primary): After any successful pick, a security-scoped bookmark
-// is saved to UserDefaults. On the next present, the bookmark is resolved
-// and set as directoryURL — the picker opens right where the user last
-// picked. For the camera-card workflow, this means the picker reopens at
-// the card's root if it is still connected.
+// Layer 0 (highest priority, optional): If the caller passes a
+// preferredStartURL — e.g. the mounted volume root of a known card the
+// user picked from the "Choose Previous" list — that URL is used as
+// directoryURL, ignoring saved bookmarks. The user lands inside the card
+// with just "Open" to tap. Used when we already know exactly where the
+// user is heading.
+//
+// Layer 1 (primary, normal case): After any successful pick, a
+// security-scoped bookmark is saved to UserDefaults. On the next present,
+// the bookmark is resolved and set as directoryURL — the picker opens
+// right where the user last picked. For the camera-card workflow, this
+// means the picker reopens at the card's root if it is still connected.
 //
 // Layer 2 (fallback): If no bookmark exists or it fails to resolve (card
 // ejected, app reinstalled), directoryURL is set to a deliberately
@@ -36,6 +43,11 @@ struct FolderPickerView: UIViewControllerRepresentable {
     /// Called when the user cancels the picker.
     let onCancelled: () -> Void
 
+    /// Optional Layer 0 hint — open the picker at this URL, bypassing the
+    /// saved bookmark. Used by the "Choose Previous" path on the main
+    /// screen, which already knows the mounted card's volume URL.
+    var preferredStartURL: URL? = nil
+
     func makeCoordinator() -> Coordinator {
         Coordinator(onPicked: onPicked, onCancelled: onCancelled)
     }
@@ -47,11 +59,14 @@ struct FolderPickerView: UIViewControllerRepresentable {
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
 
-        // Layer 1: try to resolve saved bookmark from last successful pick
-        let startURL = Self.resolvedBookmarkURL(coordinator: context.coordinator)
-
-        // Layer 2: if no bookmark, use non-resolving path to force
-        // Browse/Locations view instead of iOS's "last used" location
+        // Layer 0: caller-supplied hint wins outright. Used when the user
+        // tapped a known card in the source zone — we know exactly where
+        // they're heading and skip both bookmark + browse fallback.
+        let startURL = preferredStartURL
+            // Layer 1: try to resolve saved bookmark from last successful pick
+            ?? Self.resolvedBookmarkURL(coordinator: context.coordinator)
+            // Layer 2: if no bookmark, use non-resolving path to force
+            // Browse/Locations view instead of iOS's "last used" location
             ?? URL(fileURLWithPath: "/private/var/_force_browse_\(UUID().uuidString)")
 
         picker.directoryURL = startURL

@@ -21,6 +21,7 @@ import UniformTypeIdentifiers
 struct SelectionView: View {
 
     @Environment(\.modelContext) var modelContext
+    @Environment(\.scenePhase) var scenePhase
     @State var viewModel = SelectionViewModel()
     @State var showingManageTargets = false
     @State var showingHistory = false
@@ -30,6 +31,16 @@ struct SelectionView: View {
     @State var scanViewModel: ScanViewModel?
     @State var sessionViewModel: SessionViewModel?
     @State var navigateToSession = false
+
+    /// Volume UUIDs of removable volumes mounted right now. Populated by
+    /// SelectionView+MountedCards.refreshMountedCards(). Used by the
+    /// source zone to decide which "Known cards" rows are actionable.
+    @State var mountedCardUUIDs: Set<String> = []
+
+    /// Optional hint passed to FolderPickerView when the user tapped a
+    /// known card. Tells the picker to open at that card's volume root
+    /// instead of using the global last-source bookmark.
+    @State var preferredSourcePickerURL: URL?
 
     var body: some View {
         NavigationStack {
@@ -91,8 +102,21 @@ struct SelectionView: View {
                     }
                 }
             }
-            .task { viewModel.setup(context: modelContext) }
-            .sheet(isPresented: $viewModel.showingSourcePicker) {
+            .task {
+                viewModel.setup(context: modelContext)
+                refreshMountedCards()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                // Coming back from background often means a card was just
+                // plugged in or pulled. Refresh so the "Known cards" rows
+                // flip between actionable and gray immediately.
+                if newPhase == .active { refreshMountedCards() }
+            }
+            .sheet(isPresented: $viewModel.showingSourcePicker, onDismiss: {
+                // Clear the one-shot hint so a subsequent "Select Source"
+                // tap falls back to the saved bookmark, not a stale hint.
+                preferredSourcePickerURL = nil
+            }) {
                 FolderPickerView(
                     onPicked: { url in
                         viewModel.showingSourcePicker = false
@@ -100,7 +124,8 @@ struct SelectionView: View {
                     },
                     onCancelled: {
                         viewModel.showingSourcePicker = false
-                    }
+                    },
+                    preferredStartURL: preferredSourcePickerURL
                 )
             }
             .sheet(isPresented: $viewModel.showCardNamingDialog) {

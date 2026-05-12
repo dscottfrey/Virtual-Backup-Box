@@ -48,6 +48,41 @@ extension SelectionView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
+    /// One row in the "Known cards" list. Mounted cards render as a blue
+    /// tappable Button (label: "Choose Previous"); not-mounted cards
+    /// render as gray text. See the source-zone comment for why we keep
+    /// the non-actionable row instead of hiding it.
+    @ViewBuilder
+    func knownCardRow(for card: KnownCard) -> some View {
+        if mountedCardUUIDs.contains(card.uuid) {
+            Button {
+                chooseKnownCard(card)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sdcard")
+                    Text(card.friendlyName)
+                    Spacer()
+                    Text("Choose Previous")
+                        .fontWeight(.medium)
+                }
+                .font(.subheadline)
+                .contentShape(Rectangle())
+            }
+        } else {
+            HStack(spacing: 6) {
+                Image(systemName: "sdcard")
+                    .foregroundStyle(.secondary)
+                Text(card.friendlyName)
+                if let date = card.lastBackupDate {
+                    Spacer()
+                    Text(date, format: .dateTime.month().day())
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     /// Shows available space with a warning if below threshold.
     func spaceLabel(bytes: Int64) -> some View {
         let text = ByteCountFormatter.string(
@@ -124,29 +159,29 @@ extension SelectionView {
                 }
             }
 
-            // Quick-select: known cards (need picker for iOS access).
-            // Hide the currently selected card from this list — it's
-            // already shown above as the active source.
+            // Quick-select: known cards. Hide the currently-selected card
+            // (already shown above as the active source).
+            //
+            // Two states per row:
+            //  • Mounted right now → blue "Choose Previous" button. Tap
+            //    opens the picker pre-navigated to that card's volume
+            //    root, so the user just hits Open.
+            //  • Not mounted → gray informational text. Communicates
+            //    "we know this card exists, but it isn't plugged in."
+            //
+            // Why we can't make the not-mounted line actionable: iOS
+            // won't grant sandbox access to a volume that isn't there.
+            // The not-mounted row exists so the user understands what
+            // the app remembers — it isn't a bug that the row is inert.
             let knownCards = viewModel.recentKnownCards
                 .filter { $0.uuid != viewModel.selectedCard?.uuid }
             if !knownCards.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Known cards (select via picker)")
+                    Text("Known cards")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     ForEach(knownCards, id: \.uuid) { card in
-                        HStack(spacing: 6) {
-                            Image(systemName: "sdcard")
-                                .foregroundStyle(.secondary)
-                            Text(card.friendlyName)
-                            if let date = card.lastBackupDate {
-                                Spacer()
-                                Text(date, format: .dateTime.month().day())
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        knownCardRow(for: card)
                     }
                 }
             }
