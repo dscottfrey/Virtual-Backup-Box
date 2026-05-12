@@ -71,36 +71,52 @@ enum MountedVolumeService {
     /// URL(resolvingBookmarkData:) throws when the underlying external
     /// volume is unmounted, even though the bookmark itself is still
     /// good and will resolve again the next time the card is plugged in.
-    /// An earlier version of this code cleared on every throw and
-    /// permanently broke the "plug card back in while app is open"
-    /// scenario — the bookmark would get nilled the instant the user
-    /// unplugged, so the re-plug found nothing to resolve and the row
-    /// stayed gray. Confirmed by the debug log on 2026-05-12 (15:11:39).
-    /// If a bookmark is ever truly corrupted, the next successful pick
-    /// from the file picker simply overwrites it.
+    /// An earlier version cleared on every throw and broke the "plug
+    /// card back in while app is open" scenario (debug log 15:11:39).
     ///
-    /// Caller is responsible for startAccessingSecurityScopedResource() on
-    /// the returned URL before reading from it — resolution alone does not
-    /// start access.
+    /// What changed 2026-05-12 (round 2): checkResourceIsReachable was
+    /// returning false on a successfully-resolved URL even with the card
+    /// visibly plugged in. Hypothesis under test: reachability on a
+    /// security-scoped, bookmark-resolved URL requires
+    /// startAccessingSecurityScopedResource() to be active first — the
+    /// sandbox treats the URL as inaccessible otherwise. So we now start
+    /// access for the reachability probe and stop it before returning.
+    /// (The caller's own scope management is unaffected.) Every branch
+    /// logs a distinct line so the next failure log identifies the cause.
     static func resolve(card: KnownCard) -> Resolution {
         guard let data = card.bookmarkData else {
+            DebugLogService.shared.log(
+                "[MountedCards] \(card.friendlyName): bookmarkData is nil"
+            )
             return Resolution(isMounted: false, url: nil)
         }
 
         var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: data,
-            options: [],
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else {
-            // Almost always means "card not currently plugged in." Don't
-            // clear — re-plugging restores resolution.
+        let url: URL
+        do {
+            url = try URL(
+                resolvingBookmarkData: data,
+                options: [],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+        } catch {
             DebugLogService.shared.log(
-                "[MountedCards] bookmark for \(card.friendlyName) did not resolve (card likely not plugged in) — keeping bookmark"
+                "[MountedCards] \(card.friendlyName): URL(resolvingBookmarkData:) threw — \(error)"
             )
             return Resolution(isMounted: false, url: nil)
         }
+
+        // Start scoped access for the reachability probe, regardless of
+        // whether the start-access call returns true (some iOS versions
+        // return false on already-accessed URLs but still grant access).
+        // Stop on every exit path via the deferred block.
+        let started = url.startAccessingSecurityScopedResource()
+        defer { if started { url.stopAccessingSecurityScopedResource() } }
+
+        DebugLogService.shared.log(
+            "[MountedCards] \(card.friendlyName): resolved to \(url.path) (isStale=\(isStale), accessStarted=\(started))"
+        )
 
         // Refresh stale bookmark silently so the next resolution is clean.
         if isStale {
@@ -119,10 +135,22 @@ enum MountedVolumeService {
         // A bookmark can resolve to a URL even when the volume is gone —
         // the URL exists but the path is unreachable. checkResourceIsReachable
         // is the authoritative "is this here right now?" check.
-        let reachable = (try? url.checkResourceIsReachable()) ?? false
-        if !reachable {
+        let reachable: Bool
+        do {
+            reachable = try url.checkResourceIsReachable()
+        } catch {
             DebugLogService.shared.log(
-                "[MountedCards] bookmark for \(card.friendlyName) resolved but not reachable"
+                "[MountedCards] \(card.friendlyName): checkResourceIsReachable threw — \(error)"
+            )
+            return Resolution(isMounted: false, url: nil)
+        }
+
+        if !reachable {
+            // Cross-check with FileManager so the log distinguishes
+            // "sandbox can't see this path" from "path genuinely gone."
+            let fmExists = FileManager.default.fileExists(atPath: url.path)
+            DebugLogService.shared.log(
+                "[MountedCards] \(card.friendlyName): not reachable (FileManager.fileExists=\(fmExists))"
             )
             return Resolution(isMounted: false, url: nil)
         }

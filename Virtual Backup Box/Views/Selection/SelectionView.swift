@@ -159,9 +159,16 @@ struct SelectionView: View {
             // the user re-tap "Verify Backup Flow" than to keep a stale card.
             // Logs are temporary — diagnosing a freeze on the card naming
             // dialog Confirm button. Remove once the cause is found.
+            //
+            // Also refresh the mounted-cards set on every sourceURL change.
+            // Without this, after a successful Select New the picker keeps
+            // showing the just-picked card as "not plugged in" until the
+            // user backgrounds and returns (Scott 2026-05-12). Refreshing
+            // here makes the picker reflect reality immediately.
             .onChange(of: viewModel.sourceURL) {
-                DebugLogService.shared.log("[onChange sourceURL] firing — clearing scanViewModel")
+                DebugLogService.shared.log("[onChange sourceURL] firing — clearing scanViewModel + refreshing mounted cards")
                 scanViewModel = nil
+                refreshMountedCards()
             }
             .onChange(of: viewModel.activeTargetURL) {
                 DebugLogService.shared.log("[onChange activeTargetURL] firing — clearing scanViewModel")
