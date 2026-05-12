@@ -36,11 +36,13 @@
 
 3. **Target management UX** — Scott noted: "we should treat all target sources with privileged bookmarks where possible. Probably warrants a dropdown list before it gets too long and a place to manage locations (manage, rename and delete bookmarks from list)." The current Manage Destinations view works but could be improved with a dropdown picker on the main screen for quick target switching.
 
-4. **Terminology** — Scott noted: "the term bookmarks will confuse users." Anywhere the app surfaces "bookmark" language to the user, replace with something clearer (e.g. "saved location," "remembered drive").
+4. **Terminology** — Scott noted: "the term bookmarks will confuse users." Anywhere the app surfaces "bookmark" language to the user, replace with something clearer (e.g. "saved location," "remembered drive"). *(2026-05-11: the one user-facing instance — the "Reset Source Bookmark" ellipsis-menu item — has been renamed to "Forget Last Source." If new user-facing "bookmark" wording appears, apply the same rule.)*
 
-5. **Show log folder path in Settings** — When a debug log folder is selected, display the path to the folder in the Settings screen so the user can see where logs are being written.
+5. **Show log folder path in Settings** — When a debug log folder is selected, display the path to the folder in the Settings screen so the user can see where logs are being written. *(2026-05-11: done.)*
 
-6. **Rename "Start Backup" button to "Verify Backup Flow"** — On the main screen where source and target are chosen, change the button label from "Start Backup" to "Verify Backup Flow."
+6. **Rename "Start Backup" button to "Verify Backup Flow"** — On the main screen where source and target are chosen, change the button label from "Start Backup" to "Verify Backup Flow." *(2026-05-11: done.)*
+
+14. **Merge scan summary onto main screen** — Today, tapping the main-screen button navigates to a separate "Scan Complete" page that shows files-to-copy / already-backed-up / excluded / available space, with a second confirm button. Scott wants this summary to render inline on the main screen below the Source/Target zones, so the renamed "Verify Backup Flow" tap runs the scan in place; only after the user confirms with a second "Start Copying"-style button does navigation push to the session progress page. This eliminates the middle page and pairs naturally with the rename. Deferred from 2026-05-11 because Scott was out of time before sideloading.
 
 ### Technical Debt
 
