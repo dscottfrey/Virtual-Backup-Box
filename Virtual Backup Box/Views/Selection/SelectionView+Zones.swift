@@ -48,73 +48,93 @@ extension SelectionView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// One row in the "Known cards" list. Three visual states that map
-    /// directly to what iOS will and won't let us do with this card:
+    /// Pulldown of known cards plus a "Select Previous" button.
     ///
-    ///  1. Mounted right now AND a bookmark is stored on the card → blue,
-    ///     tappable "Choose Previous" Button. One tap re-selects the card
-    ///     as the source with no picker, by resolving the stored
-    ///     security-scoped bookmark.
+    /// Design rationale (Scott's 2026-05-12 UX direction): users will
+    /// typically own multiple cards (one body, two cards; multiple bodies,
+    /// many cards). A per-row "Choose Previous" button scales poorly past
+    /// two cards. A single pulldown + action button is cleaner and reads
+    /// as "pick a card from history → confirm." The default selection is
+    /// the most-recently backed-up card (already top of recentKnownCards)
+    /// because that's the one a returning user most likely wants.
     ///
-    ///  2. Bookmark stored but not mounted right now → gray with
-    ///     "Not plugged in" subtext. We know the card exists and we have
-    ///     the means to one-tap it, but it isn't here. Inert by design.
+    /// Three states for the action button, mapped to what iOS will let us
+    /// do with the currently-selected card:
     ///
-    ///  3. No bookmark stored yet (legacy cards from before the bookmark
-    ///     property existed, or a card whose bookmark went stale and was
-    ///     cleared) → gray with "Pick once to enable quick-select"
-    ///     subtext. The user has to do one normal "Select Source" pick of
-    ///     this card; that pick captures a bookmark and from then on the
-    ///     row moves into state 1 or 2.
+    ///  1. Card mounted AND bookmark stored → button enabled (blue).
+    ///     Tap resolves the bookmark and selects the card as source.
+    ///     No file picker is presented.
     ///
-    /// Why we keep states 2 and 3 visible instead of hiding them:
-    /// CLAUDE.md and Scott's UX brief — the app should explain what the
-    /// user CAN do and why something isn't doing what they expect. Hiding
-    /// a known card just because it isn't plugged in would lose the
-    /// guidance, and silently showing a tappable row that doesn't work
-    /// would be the original "misleading and confusing" complaint.
+    ///  2. Bookmark stored but card not plugged in → button disabled,
+    ///     helper line below says "Not plugged in." User needs to plug
+    ///     the card in (or pick a different one from the pulldown).
+    ///
+    ///  3. No bookmark on this card yet → button disabled, helper line
+    ///     says "Pick once via Select Source to enable quick-select."
+    ///     One normal pick captures the bookmark; future sessions are
+    ///     one-tap.
     @ViewBuilder
-    func knownCardRow(for card: KnownCard) -> some View {
-        let hasBookmark = card.bookmarkData != nil
-        let isMounted = mountedCardUUIDs.contains(card.uuid)
+    func knownCardsPicker(knownCards: [KnownCard]) -> some View {
+        let selected = currentlySelectedKnownCard(from: knownCards)
+        let hasBookmark = selected?.bookmarkData != nil
+        let isMounted = selected.map { mountedCardUUIDs.contains($0.uuid) } ?? false
+        let canSelect = hasBookmark && isMounted
 
-        if isMounted && hasBookmark {
-            // State 1: blue tappable
-            Button {
-                chooseKnownCard(card)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "sdcard")
-                    Text(card.friendlyName)
-                    Spacer()
-                    Text("Choose Previous")
-                        .fontWeight(.medium)
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Known cards")
                 .font(.subheadline)
-                .contentShape(Rectangle())
-            }
-        } else {
-            // States 2 & 3: gray, inert, with a guidance subtitle.
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sdcard")
-                    Text(card.friendlyName)
-                    if let date = card.lastBackupDate {
-                        Spacer()
-                        Text(date, format: .dateTime.month().day())
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Picker(
+                    "Known card",
+                    selection: Binding(
+                        get: { selected?.uuid ?? knownCards.first?.uuid ?? "" },
+                        set: { selectedKnownCardUUID = $0 }
+                    )
+                ) {
+                    ForEach(knownCards, id: \.uuid) { card in
+                        Text(card.friendlyName).tag(card.uuid)
                     }
                 }
-                .font(.subheadline)
+                .pickerStyle(.menu)
+                .labelsHidden()
 
+                Spacer()
+
+                Button {
+                    if let card = selected { chooseKnownCard(card) }
+                } label: {
+                    Label("Select Previous", systemImage: "arrow.uturn.backward")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!canSelect)
+            }
+
+            if let card = selected, !canSelect {
                 Text(
                     hasBookmark
-                        ? "Not plugged in"
-                        : "Pick once via Select Source to enable quick-select"
+                        ? "\(card.friendlyName) is not plugged in"
+                        : "Pick \(card.friendlyName) once via Select Source to enable quick-select"
                 )
                 .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .foregroundStyle(.secondary)
         }
+    }
+
+    /// Returns the KnownCard the user has chosen in the pulldown, or the
+    /// list's first entry when @State hasn't been set yet (initial render
+    /// or the previously selected UUID is no longer in the filtered list).
+    private func currentlySelectedKnownCard(
+        from knownCards: [KnownCard]
+    ) -> KnownCard? {
+        if let uuid = selectedKnownCardUUID,
+           let match = knownCards.first(where: { $0.uuid == uuid }) {
+            return match
+        }
+        return knownCards.first
     }
 
     /// Shows available space with a warning if below threshold.
@@ -193,31 +213,13 @@ extension SelectionView {
                 }
             }
 
-            // Quick-select: known cards. Hide the currently-selected card
-            // (already shown above as the active source).
-            //
-            // Two states per row:
-            //  • Mounted right now → blue "Choose Previous" button. Tap
-            //    opens the picker pre-navigated to that card's volume
-            //    root, so the user just hits Open.
-            //  • Not mounted → gray informational text. Communicates
-            //    "we know this card exists, but it isn't plugged in."
-            //
-            // Why we can't make the not-mounted line actionable: iOS
-            // won't grant sandbox access to a volume that isn't there.
-            // The not-mounted row exists so the user understands what
-            // the app remembers — it isn't a bug that the row is inert.
+            // Quick-select: known cards. Hidden when the only known card
+            // is the active source — there's nothing to re-pick. Anticipates
+            // a multi-card workflow (one user, two bodies, several SD cards).
             let knownCards = viewModel.recentKnownCards
                 .filter { $0.uuid != viewModel.selectedCard?.uuid }
             if !knownCards.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Known cards")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    ForEach(knownCards, id: \.uuid) { card in
-                        knownCardRow(for: card)
-                    }
-                }
+                knownCardsPicker(knownCards: knownCards)
             }
 
             Button {

@@ -35,9 +35,16 @@ struct SelectionView: View {
     /// UUIDs of KnownCards whose stored bookmark resolves to a reachable
     /// URL right now — i.e. cards plugged in *and* with sandbox access
     /// already granted. Populated by
-    /// SelectionView+MountedCards.refreshMountedCards(). Drives the
-    /// "Choose Previous" tappable rows in the source zone.
+    /// SelectionView+MountedCards.refreshMountedCards(). Drives whether
+    /// the "Select Previous" button is enabled and which helper text the
+    /// source zone shows under the known-cards picker.
     @State var mountedCardUUIDs: Set<String> = []
+
+    /// UUID of the KnownCard currently chosen in the source zone's
+    /// "Known cards" pulldown. Defaults on appear to the most-recently
+    /// backed-up card that isn't the current source. Stored as a String
+    /// so the binding survives SwiftData object refresh.
+    @State var selectedKnownCardUUID: String?
 
     var body: some View {
         NavigationStack {
