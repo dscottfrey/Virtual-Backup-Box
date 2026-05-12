@@ -48,62 +48,70 @@ extension SelectionView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// Pulldown of known cards plus a "Select Previous" button.
+    /// Pulldown of known cards (no button — the action button lives in
+    /// the source zone's bottom row alongside "Select New" so the two
+    /// source-selection actions sit side by side).
     ///
     /// Design rationale (Scott's 2026-05-12 UX direction): users will
     /// typically own multiple cards (one body, two cards; multiple bodies,
     /// many cards). A per-row "Choose Previous" button scales poorly past
-    /// two cards. A single pulldown + action button is cleaner and reads
-    /// as "pick a card from history → confirm." The default selection is
-    /// the most-recently backed-up card (already top of recentKnownCards)
-    /// because that's the one a returning user most likely wants.
+    /// two cards. A single pulldown is cleaner. Defaults to the most-
+    /// recently backed-up card (top of recentKnownCards) because that's
+    /// what a returning user most likely wants.
     ///
-    /// Three states for the action button, mapped to what iOS will let us
-    /// do with the currently-selected card:
-    ///
-    ///  1. Card mounted AND bookmark stored → button enabled (blue).
-    ///     Tap resolves the bookmark and selects the card as source.
-    ///     No file picker is presented.
-    ///
-    ///  2. Bookmark stored but card not plugged in → button disabled,
-    ///     helper line below says "Not plugged in." User needs to plug
-    ///     the card in (or pick a different one from the pulldown).
-    ///
-    ///  3. No bookmark on this card yet → button disabled, helper line
-    ///     says "Pick once via Select Source to enable quick-select."
-    ///     One normal pick captures the bookmark; future sessions are
-    ///     one-tap.
+    /// Layout history — what we tried and why this is the layout now:
+    /// First version placed the "Select Previous" button beside the
+    /// picker in an HStack. With a long card name like "Canon EOS R6
+    /// Card-256Gb", the picker text wrapped across three lines and the
+    /// helper text below it bled into the "Select Source" button beneath
+    /// the section (screenshot 2026-05-12 15:24). Splitting picker and
+    /// action button onto separate rows gives the picker the full row
+    /// width and keeps long names on one line.
     @ViewBuilder
     func knownCardsPicker(knownCards: [KnownCard]) -> some View {
         let selected = currentlySelectedKnownCard(from: knownCards)
-        let hasBookmark = selected?.bookmarkData != nil
-        let isMounted = selected.map { mountedCardUUIDs.contains($0.uuid) } ?? false
-        let canSelect = hasBookmark && isMounted
+        let canSelect = canSelectPreviousCard(from: knownCards)
 
         VStack(alignment: .leading, spacing: 6) {
             Text("Known cards")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 8) {
-                Picker(
-                    "Known card",
-                    selection: Binding(
-                        get: { selected?.uuid ?? knownCards.first?.uuid ?? "" },
-                        set: { selectedKnownCardUUID = $0 }
-                    )
-                ) {
-                    ForEach(knownCards, id: \.uuid) { card in
-                        Text(card.friendlyName).tag(card.uuid)
-                    }
+            Picker(
+                "Known card",
+                selection: Binding(
+                    get: { selected?.uuid ?? knownCards.first?.uuid ?? "" },
+                    set: { selectedKnownCardUUID = $0 }
+                )
+            ) {
+                ForEach(knownCards, id: \.uuid) { card in
+                    Text(card.friendlyName).tag(card.uuid)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
 
-                Spacer()
+            if let card = selected, !canSelect {
+                Text(helperText(for: card))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 
+    /// Bottom action row of the source zone: "Select Previous" (only
+    /// shown when there are known cards other than the current source)
+    /// and "Select New" (always shown). Side by side so the user has a
+    /// clear binary choice — pick again from history, or pick fresh.
+    @ViewBuilder
+    func sourceActionButtons(knownCards: [KnownCard]) -> some View {
+        HStack(spacing: 12) {
+            if !knownCards.isEmpty {
+                let canSelect = canSelectPreviousCard(from: knownCards)
                 Button {
-                    if let card = selected { chooseKnownCard(card) }
+                    if let card = currentlySelectedKnownCard(from: knownCards) {
+                        chooseKnownCard(card)
+                    }
                 } label: {
                     Label("Select Previous", systemImage: "arrow.uturn.backward")
                         .font(.subheadline)
@@ -112,15 +120,15 @@ extension SelectionView {
                 .disabled(!canSelect)
             }
 
-            if let card = selected, !canSelect {
-                Text(
-                    hasBookmark
-                        ? "\(card.friendlyName) is not plugged in"
-                        : "Pick \(card.friendlyName) once via Select Source to enable quick-select"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Button {
+                viewModel.showingSourcePicker = true
+            } label: {
+                Label("Select New", systemImage: "folder")
+                    .font(.subheadline)
             }
+            .buttonStyle(.bordered)
+
+            Spacer()
         }
     }
 
@@ -135,6 +143,26 @@ extension SelectionView {
             return match
         }
         return knownCards.first
+    }
+
+    /// True when the currently-selected known card has a stored bookmark
+    /// AND is mounted right now — the only state where Select Previous
+    /// can succeed.
+    private func canSelectPreviousCard(from knownCards: [KnownCard]) -> Bool {
+        guard let card = currentlySelectedKnownCard(from: knownCards) else {
+            return false
+        }
+        return card.bookmarkData != nil
+            && mountedCardUUIDs.contains(card.uuid)
+    }
+
+    /// Plain-English explanation for why Select Previous is disabled for
+    /// the given card. Two cases mapped to two iOS limitations.
+    private func helperText(for card: KnownCard) -> String {
+        if card.bookmarkData == nil {
+            return "Pick \(card.friendlyName) once via Select New to enable quick-select"
+        }
+        return "\(card.friendlyName) is not plugged in"
     }
 
     /// Shows available space with a warning if below threshold.
@@ -213,23 +241,17 @@ extension SelectionView {
                 }
             }
 
-            // Quick-select: known cards. Hidden when the only known card
-            // is the active source — there's nothing to re-pick. Anticipates
-            // a multi-card workflow (one user, two bodies, several SD cards).
+            // Quick-select: known cards. The pulldown is hidden when the
+            // only known card is the active source (nothing to re-pick),
+            // but the action row is always shown so "Select New" is
+            // always reachable.
             let knownCards = viewModel.recentKnownCards
                 .filter { $0.uuid != viewModel.selectedCard?.uuid }
             if !knownCards.isEmpty {
                 knownCardsPicker(knownCards: knownCards)
             }
 
-            Button {
-                viewModel.showingSourcePicker = true
-            } label: {
-                Label(
-                    viewModel.sourceURL == nil ? "Select Source" : "Change Source",
-                    systemImage: "folder"
-                )
-            }
+            sourceActionButtons(knownCards: knownCards)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
