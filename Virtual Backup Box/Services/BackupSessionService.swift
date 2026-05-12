@@ -87,6 +87,19 @@ enum BackupSessionService {
                 modelContext: modelContext
             )
 
+            // Cancellation lands here too: processFile returns false when
+            // CopyEngine throws .cancelled. Check Task.isCancelled BEFORE
+            // treating the false as a real per-file failure — otherwise
+            // tapping Cancel surfaces a "File Could Not Be Backed Up"
+            // dialog (Scott 2026-05-12), which is misleading and demands
+            // a "Continue Backup" decision the user has already declined.
+            if Task.isCancelled {
+                finalise(session: session, status: .interrupted,
+                         selectedCard: selectedCard,
+                         sessionViewModel: sessionViewModel)
+                return
+            }
+
             if !succeeded {
                 session.filesFailed += 1
                 sessionViewModel.filesFailed += 1
@@ -238,6 +251,15 @@ enum BackupSessionService {
                     }
                 }
             } catch {
+                // Cancellation reaches us via CopyEngine throwing
+                // .cancelled. Bail out immediately rather than logging
+                // it as a copy failure and burning a retry cycle.
+                if Task.isCancelled {
+                    DebugLogService.shared.log(
+                        "[BackupSession] cancelled during \(file.relativePath)"
+                    )
+                    return false
+                }
                 // Catch was silent before 2026-05-12 — Scott hit a "Could
                 // not be backed up after 3 attempts" with no log line
                 // explaining which error fired. Logging the error type and
