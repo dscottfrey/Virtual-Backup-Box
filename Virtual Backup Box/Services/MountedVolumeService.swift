@@ -65,8 +65,19 @@ enum MountedVolumeService {
     }
 
     /// Resolves a single card's bookmark and returns whether it is mounted
-    /// plus the live URL. Refreshes a stale bookmark in place. Clears the
-    /// bookmark on the card if it fails to resolve at all.
+    /// plus the live URL. Refreshes a stale bookmark in place.
+    ///
+    /// Important — does NOT clear the bookmark on failure. On iOS,
+    /// URL(resolvingBookmarkData:) throws when the underlying external
+    /// volume is unmounted, even though the bookmark itself is still
+    /// good and will resolve again the next time the card is plugged in.
+    /// An earlier version of this code cleared on every throw and
+    /// permanently broke the "plug card back in while app is open"
+    /// scenario — the bookmark would get nilled the instant the user
+    /// unplugged, so the re-plug found nothing to resolve and the row
+    /// stayed gray. Confirmed by the debug log on 2026-05-12 (15:11:39).
+    /// If a bookmark is ever truly corrupted, the next successful pick
+    /// from the file picker simply overwrites it.
     ///
     /// Caller is responsible for startAccessingSecurityScopedResource() on
     /// the returned URL before reading from it — resolution alone does not
@@ -83,10 +94,11 @@ enum MountedVolumeService {
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {
+            // Almost always means "card not currently plugged in." Don't
+            // clear — re-plugging restores resolution.
             DebugLogService.shared.log(
-                "[MountedCards] bookmark for \(card.friendlyName) failed to resolve — clearing"
+                "[MountedCards] bookmark for \(card.friendlyName) did not resolve (card likely not plugged in) — keeping bookmark"
             )
-            card.bookmarkData = nil
             return Resolution(isMounted: false, url: nil)
         }
 
