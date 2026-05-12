@@ -32,6 +32,14 @@ final class DebugLogService: @unchecked Sendable {
     /// Whether a log location has been configured.
     var isConfigured: Bool { logFileURL != nil }
 
+    /// The folder where logs are being written, for display in Settings.
+    /// Returns nil if no folder is configured. Uses the parent of the log
+    /// file URL rather than tracking a separate folder URL because the file
+    /// URL is the single source of truth for "is logging configured."
+    var logFolderURL: URL? {
+        logFileURL?.deletingLastPathComponent()
+    }
+
     /// Writes a timestamped log entry. Thread-safe. Silently skips if
     /// no log location is configured.
     func log(_ message: String, file: String = #file, function: String = #function) {

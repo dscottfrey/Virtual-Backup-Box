@@ -32,6 +32,16 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
+                        if let folderURL = DebugLogService.shared.logFolderURL {
+                            // Show the full path so the user can confirm where
+                            // logs are going (e.g. an iCloud Drive folder vs a
+                            // local one). monospaced to keep paths readable.
+                            Text(folderURL.path)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+
                         Button("Change Log Folder") {
                             showingLogFolderPicker = true
                         }
