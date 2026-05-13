@@ -68,6 +68,54 @@ class FileBrowserViewModel {
         clearSelection()
     }
 
+    // MARK: - Arbitrary Folder Browse
+    //
+    // Powers the "Choose Folder…" entry in CardPickerView so the user can
+    // browse media in any folder reachable via the document picker — not
+    // just card mirrors on internal storage. The URL comes in carrying
+    // security scope from FolderPickerView; we retain that scope for the
+    // life of the browse session and release it explicitly when the user
+    // backs out (releaseArbitraryFolderAccess, called from .onDisappear in
+    // CardPickerView's navigationDestination).
+    //
+    // We synthesize a minimal CardMirror with zero counts because
+    // CardPickerView's grid view doesn't consult the count fields — they
+    // exist only for the card-mirror list row UI. The actual image/video
+    // lists are populated by selectCard's enumeration.
+
+    /// The security-scoped URL currently in use for an arbitrary-folder
+    /// browse, retained so its scope can be released when the user exits
+    /// the browse session. Nil when the browser is showing card mirrors.
+    private var arbitraryFolderAccessedURL: URL?
+
+    /// Opens any folder URL (typically returned by FolderPickerView) as a
+    /// pseudo card-mirror so the existing MediaGridView can list it.
+    func loadArbitraryFolder(url: URL) {
+        releaseArbitraryFolderAccess()
+        if url.startAccessingSecurityScopedResource() {
+            arbitraryFolderAccessedURL = url
+        }
+
+        let mirror = CardMirror(
+            id: url.path,
+            folderURL: url,
+            folderName: url.lastPathComponent,
+            cardName: nil,
+            cameraModel: nil,
+            imageCount: 0,
+            videoCount: 0,
+            totalSizeBytes: 0
+        )
+        selectCard(mirror)
+    }
+
+    /// Releases the security-scoped access started by loadArbitraryFolder.
+    /// Safe to call when no arbitrary folder is active.
+    func releaseArbitraryFolderAccess() {
+        arbitraryFolderAccessedURL?.stopAccessingSecurityScopedResource()
+        arbitraryFolderAccessedURL = nil
+    }
+
     // MARK: - Multi-Select
 
     func toggleSelection(_ file: MediaFile) {
