@@ -2,29 +2,42 @@
 // Virtual Backup Box
 //
 // UIViewControllerRepresentable wrapper around UIDocumentPickerViewController
-// for folder selection. Uses a two-layer strategy to control where the
-// picker opens:
+// for folder selection. The picker is configured to land at the Files app's
+// Browse/Locations root every time it opens, so the user can see connected
+// drives, cards, iCloud Drive, and on-device storage as siblings — no
+// "Recents" detour, no being buried deep in iCloud after an alternating
+// source/destination pick.
 //
-// Layer 1 (primary): After any successful pick, a security-scoped bookmark
-// is saved to UserDefaults. On the next present, the bookmark is resolved
-// and set as directoryURL — the picker opens right where the user last
-// picked. For the camera-card workflow, this means the picker reopens at
-// the card's root if it is still connected.
+// How the Browse/Locations landing is achieved: directoryURL is set to a
+// deliberately non-resolving path. UIDocumentPicker can't navigate there,
+// so it falls back to the Browse view at the top of the navigation stack.
+// This is undocumented behavior — Apple could change it in a future iOS
+// release — but it has been the most reliable way found to escape the
+// "open where you last picked" default and is in production today.
 //
-// Layer 2 (fallback): If no bookmark exists or it fails to resolve (card
-// ejected, app reinstalled), directoryURL is set to a deliberately
-// non-resolving path. This causes the picker to fall back to the
-// Browse/Locations root where connected drives and cards are visible —
-// instead of burying the user inside "On My iPhone."
+// What we tried before and why this is the layout now:
+// An earlier two-layer strategy resolved a saved last-pick bookmark as
+// the primary path and only fell back to the non-resolving URL on first
+// run or card-ejected cases. The problem (Scott 2026-05-13): the user
+// alternates source and destination picks. After picking a destination
+// deep inside iCloud Drive, the next source pick reopened in that same
+// iCloud subfolder — exactly where the camera card is NOT. Forcing the
+// picker to root every time is the user's clearly stated preference even
+// though it means an extra scroll-tap on each pick.
 //
-// The non-resolving URL trick (Layer 2) is undocumented behavior. Apple
-// could change it in a future iOS release. Layer 1 is the real fix;
-// Layer 2 is a cosmetic fallback for first-run and card-ejected cases.
+// What we still save (but don't read) for bookmarks:
+// saveBookmark(for:) is still called from the coordinator after every
+// successful pick. The data sits unused in UserDefaults — preserved so a
+// future "smart starting location" feature can revive last-pick or
+// quick-select without needing to re-grant permissions. clearBookmark()
+// is kept for the same reason. If those become genuinely dead, delete
+// them then; today they cost nothing.
 //
 // A previous "Layer 0" tried to pre-navigate the picker to a mounted
 // card's volume root from MountedVolumeService. That service is now
-// bookmark-based and the "Choose Previous" path skips the picker
-// entirely, so Layer 0 was removed in 2026-05-12 as dead code.
+// bookmark-based and the "Choose Previous" path skipped the picker
+// entirely (now also removed from UI, 2026-05-13). Layer 0 was dropped
+// 2026-05-12 as dead code.
 
 import SwiftUI
 import UIKit
@@ -52,15 +65,18 @@ struct FolderPickerView: UIViewControllerRepresentable {
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
 
-        // Layer 1: try to resolve saved bookmark from last successful pick
-        let startURL = Self.resolvedBookmarkURL(coordinator: context.coordinator)
-            // Layer 2: if no bookmark, use non-resolving path to force
-            // Browse/Locations view instead of iOS's "last used" location
-            ?? URL(fileURLWithPath: "/private/var/_force_browse_\(UUID().uuidString)")
-
+        // Always force Browse/Locations root via a non-resolving directoryURL.
+        // The UUID suffix guarantees a path UIDocumentPicker has no chance of
+        // resolving, which triggers the fallback to the Browse navigation
+        // root. See the file header for the full rationale and history.
+        let startURL = URL(
+            fileURLWithPath: "/private/var/_force_browse_\(UUID().uuidString)"
+        )
         picker.directoryURL = startURL
 
-        DebugLogService.shared.log("[FolderPicker] directoryURL set to: \(startURL.path)")
+        DebugLogService.shared.log(
+            "[FolderPicker] directoryURL forced to non-resolving path: \(startURL.path)"
+        )
         return picker
     }
 
@@ -70,62 +86,16 @@ struct FolderPickerView: UIViewControllerRepresentable {
     ) {}
 
     // MARK: - Bookmark Management
+    //
+    // Bookmarks are still saved on every successful pick so a future
+    // smart-starting-location feature can revive them without re-prompting
+    // for permission. They are NOT read to position the picker today —
+    // the picker always opens at Browse/Locations root (see makeUIViewController).
 
-    /// Resolves the saved bookmark, returning a usable URL if the volume
-    /// is still mounted. Refreshes stale bookmarks automatically. Clears
-    /// the stored bookmark if resolution fails entirely.
-    private static func resolvedBookmarkURL(coordinator: Coordinator) -> URL? {
-        guard let data = UserDefaults.standard.data(
-            forKey: bookmarkKey
-        ) else {
-            DebugLogService.shared.log("[FolderPicker] No saved bookmark — using fallback")
-            return nil
-        }
-
-        var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: data,
-            options: [],
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else {
-            DebugLogService.shared.log("[FolderPicker] Bookmark failed to resolve — clearing")
-            UserDefaults.standard.removeObject(forKey: bookmarkKey)
-            return nil
-        }
-
-        // Refresh stale bookmark silently
-        if isStale {
-            if let refreshed = try? url.bookmarkData(
-                options: [],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            ) {
-                UserDefaults.standard.set(refreshed, forKey: bookmarkKey)
-                DebugLogService.shared.log("[FolderPicker] Refreshed stale bookmark")
-            } else {
-                UserDefaults.standard.removeObject(forKey: bookmarkKey)
-                DebugLogService.shared.log("[FolderPicker] Stale bookmark could not refresh — clearing")
-                return nil
-            }
-        }
-
-        // Check the volume is actually mounted
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            DebugLogService.shared.log("[FolderPicker] Bookmarked path not mounted — using fallback")
-            return nil
-        }
-
-        // Start security-scoped access so the picker can open inside
-        if url.startAccessingSecurityScopedResource() {
-            coordinator.accessedURL = url
-        }
-        DebugLogService.shared.log("[FolderPicker] Resolved bookmark: \(url.path)")
-        return url
-    }
-
-    /// Saves a security-scoped bookmark for the given URL so the picker
-    /// opens here next time.
+    /// Saves a security-scoped bookmark for the given URL. Currently used
+    /// only as future-proofing — the data is preserved in UserDefaults so
+    /// quick-select or last-pick-restoration can be added later without
+    /// having to re-request permission from the user.
     static func saveBookmark(for url: URL) {
         do {
             let data = try url.bookmarkData(
@@ -151,10 +121,6 @@ struct FolderPickerView: UIViewControllerRepresentable {
         let onPicked: (URL) -> Void
         let onCancelled: () -> Void
 
-        /// Tracks a URL we started security-scoped access on for the
-        /// picker's directoryURL. Must be stopped when the picker closes.
-        var accessedURL: URL?
-
         init(onPicked: @escaping (URL) -> Void,
              onCancelled: @escaping () -> Void) {
             self.onPicked = onPicked
@@ -165,10 +131,11 @@ struct FolderPickerView: UIViewControllerRepresentable {
             _ controller: UIDocumentPickerViewController,
             didPickDocumentsAt urls: [URL]
         ) {
-            defer { stopAccess() }
             guard let url = urls.first else { return }
 
-            // Save bookmark so the picker opens here next time
+            // Save the bookmark even though we no longer read it to position
+            // the next picker — see file header. Future-proofing for a
+            // possible quick-select revival.
             FolderPickerView.saveBookmark(for: url)
 
             onPicked(url)
@@ -177,13 +144,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
         func documentPickerWasCancelled(
             _ controller: UIDocumentPickerViewController
         ) {
-            stopAccess()
             onCancelled()
-        }
-
-        private func stopAccess() {
-            accessedURL?.stopAccessingSecurityScopedResource()
-            accessedURL = nil
         }
     }
 }
