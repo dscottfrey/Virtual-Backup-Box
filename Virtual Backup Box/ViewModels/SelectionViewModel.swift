@@ -62,6 +62,15 @@ class SelectionViewModel {
     var pendingBookmarkData: Data?
     var pendingTargetName = ""
 
+    /// True while resolveKnownTargets is iterating bookmarks. Drives the
+    /// "Checking availability…" footer in ManageTargetsView so the user
+    /// understands why rows might appear gray for a second or two after
+    /// the sheet opens — iOS's UserFS file provider needs to wake before
+    /// bookmarks resolve and reachability turns true. Added 2026-05-13
+    /// after Scott reported that the flash drive row "took quite a
+    /// while to turn green" with no on-screen explanation.
+    var isResolvingTargets = false
+
     // MARK: - Picker State
 
     var showingSourcePicker = false

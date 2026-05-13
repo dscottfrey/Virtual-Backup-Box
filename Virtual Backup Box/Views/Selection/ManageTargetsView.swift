@@ -52,8 +52,24 @@ struct ManageTargetsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ForEach(viewModel.allTargets) { target in
-                    targetRow(target)
+                Section {
+                    ForEach(viewModel.allTargets) { target in
+                        targetRow(target)
+                    }
+                } footer: {
+                    // Tells the user why the green dots might not be lit
+                    // yet — first sheet open after plugging a drive in
+                    // can take a few seconds while iOS wakes the per-
+                    // volume UserFS file provider.
+                    if viewModel.isResolvingTargets {
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Checking availability\u{2026} this can take a few seconds for newly-plugged drives.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
 
                 if !viewModel.hasInternalStorageTarget {

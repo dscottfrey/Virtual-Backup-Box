@@ -13,9 +13,24 @@ extension SelectionViewModel {
 
     // MARK: - Target Resolution
 
-    /// Fetches all KnownTargets from the database, resolves each bookmark to
-    /// check availability, and sets the first available one as the active
-    /// target. Called on app launch and after any target is added or removed.
+    /// Fetches all KnownTargets, resolves each bookmark, and sets the
+    /// first available one as the active target. Called on launch and
+    /// after any target is added or removed. Kept as a sync entry point
+    /// — internally spawns a Task and runs each bookmark resolution off
+    /// the main thread so the UI stays responsive while iOS wakes the
+    /// per-volume UserFS file provider.
+    ///
+    /// Why this is async-internally instead of blocking:
+    /// URL(resolvingBookmarkData:) waits for the file provider IPC to
+    /// answer. On a freshly-plugged USB drive that wait can be several
+    /// seconds. Resolving N targets sequentially on the main thread
+    /// froze the Manage Destinations sheet — rows stayed gray with no
+    /// indication anything was happening (Scott 2026-05-13: "took quite
+    /// a while to turn green, we should have a warning that there is a
+    /// delay"). Moving the per-target resolveBookmark call into a
+    /// detached task lets SwiftUI render the "Checking availability…"
+    /// state from isResolvingTargets, and the rows update one-by-one as
+    /// each resolution completes.
     func resolveKnownTargets() {
         guard let context = modelContext else { return }
 
@@ -31,29 +46,52 @@ extension SelectionViewModel {
         availableSpaceBytes = nil
         targetAvailability = [:]
 
-        for target in allTargets {
-            guard let resolved = BookmarkService.resolveBookmark(
-                target.bookmarkData
-            ) else {
-                targetAvailability[ObjectIdentifier(target)] = false
-                continue
-            }
+        // Snapshot the targets and their bookmark data — KnownTarget is
+        // a SwiftData model and only safe to read on the main actor.
+        // bookmarkData is plain Data and crosses to the detached task
+        // without trouble.
+        let snapshot: [(target: KnownTarget, bookmarkData: Data)] =
+            allTargets.map { ($0, $0.bookmarkData) }
 
-            let url = resolved.url
-            let granted = url.startAccessingSecurityScopedResource()
-            let readable = granted && FileManager.default.isReadableFile(
-                atPath: url.path
-            )
-            targetAvailability[ObjectIdentifier(target)] = readable
+        isResolvingTargets = true
+        Task { @MainActor in
+            defer { isResolvingTargets = false }
 
-            if readable && activeTarget == nil {
-                // First available target — keep access open
-                activeTarget = target
-                activeTargetURL = url
-                availableSpaceBytes = BookmarkService.availableSpace(at: url)
-            } else if granted {
-                // Not using this one — release access
-                url.stopAccessingSecurityScopedResource()
+            for entry in snapshot {
+                // Bookmark resolution can block for seconds waiting on
+                // the file provider. Detached so it doesn't freeze main.
+                let resolved = await Task.detached {
+                    BookmarkService.resolveBookmark(entry.bookmarkData)
+                }.value
+
+                guard let resolved else {
+                    targetAvailability[ObjectIdentifier(entry.target)] = false
+                    continue
+                }
+
+                let url = resolved.url
+                let granted = url.startAccessingSecurityScopedResource()
+                let readable = granted && FileManager.default.isReadableFile(
+                    atPath: url.path
+                )
+                targetAvailability[ObjectIdentifier(entry.target)] = readable
+
+                if readable && activeTarget == nil {
+                    // First available target — keep access open
+                    activeTarget = entry.target
+                    activeTargetURL = url
+                    availableSpaceBytes = BookmarkService.availableSpace(
+                        at: url
+                    )
+                } else if granted {
+                    // Not using this one — release access
+                    url.stopAccessingSecurityScopedResource()
+                }
+
+                // Yield between targets so SwiftUI repaints the per-row
+                // dots and the "Checking availability…" footer doesn't
+                // appear to all-update-at-once at the very end.
+                await Task.yield()
             }
         }
     }
