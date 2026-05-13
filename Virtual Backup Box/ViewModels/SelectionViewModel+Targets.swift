@@ -80,25 +80,79 @@ extension SelectionViewModel {
 
     // MARK: - Adding a Target
 
+    /// The outcome of a fileImporter pick for a backup destination.
+    /// Lets the view choose between showing the naming alert (a real
+    /// new target), silently activating an existing target (the picked
+    /// URL matches a known one — no duplicate created), or doing nothing
+    /// on a failure to access or bookmark the URL.
+    enum TargetPickResult {
+        case new
+        case existing(KnownTarget)
+        case failed
+    }
+
     /// Handles a URL selected from the document picker for a new target.
     ///
-    /// Creates the security-scoped bookmark immediately (while access is
-    /// active from the picker) and stores it for the user to confirm with
-    /// a friendly name. Returns true if the bookmark was created, false if
-    /// access or bookmark creation failed.
-    func handleTargetSelected(url: URL) -> Bool {
+    /// Before treating the URL as a brand-new target, every known
+    /// target's bookmark is resolved and compared by file path. If a
+    /// match is found the existing target is activated and no new
+    /// KnownTarget is created — fixes the duplicate-on-re-pick problem
+    /// Scott surfaced 2026-05-13 (couldn't tap the gray flash-drive row
+    /// in Manage Destinations, fell back to Add External, ended up with
+    /// two entries for the same drive).
+    ///
+    /// Otherwise creates the security-scoped bookmark immediately (while
+    /// access from the picker is still live) and stores it on the
+    /// pending-bookmark state for the user to confirm with a name.
+    func handleTargetSelected(url: URL) -> TargetPickResult {
         let granted = url.startAccessingSecurityScopedResource()
         defer { url.stopAccessingSecurityScopedResource() }
-        guard granted else { return false }
+        guard granted else { return .failed }
+
+        // Dedup: does any known target already resolve to this path?
+        if let existing = findKnownTarget(matchingPath: url.path) {
+            selectTarget(existing)
+            return .existing(existing)
+        }
 
         guard let bookmarkData = try? BookmarkService.createBookmark(
             for: url
-        ) else { return false }
+        ) else { return .failed }
 
         pendingBookmarkData = bookmarkData
         pendingTargetName = BookmarkService.volumeName(at: url)
             ?? url.lastPathComponent
-        return true
+        return .new
+    }
+
+    /// Resolves every known target and returns the first whose bookmarked
+    /// URL matches the given file path. Used by handleTargetSelected to
+    /// avoid creating duplicate KnownTargets when the user re-picks a
+    /// drive that is already saved.
+    ///
+    /// Note on path equality: we compare on URL.path strings rather than
+    /// URL equality. Two URLs to the same file can differ in trailing
+    /// slash, file-reference vs path style, etc. The string path
+    /// normalisation is good enough for the "is this the same volume
+    /// folder?" question we are actually answering here.
+    private func findKnownTarget(matchingPath path: String) -> KnownTarget? {
+        for target in allTargets {
+            guard let resolved = BookmarkService.resolveBookmark(
+                target.bookmarkData
+            ) else { continue }
+
+            let started = resolved.url.startAccessingSecurityScopedResource()
+            defer {
+                if started {
+                    resolved.url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            if resolved.url.path == path {
+                return target
+            }
+        }
+        return nil
     }
 
     /// Saves the pending target with the user-confirmed friendly name.

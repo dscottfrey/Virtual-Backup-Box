@@ -7,6 +7,18 @@
 //
 // Adding a target opens the system folder picker, then prompts for a
 // friendly name. The bookmark and name are saved to SwiftData.
+//
+// Availability refresh (2026-05-13): the target list re-resolves every
+// time this sheet appears AND on scenePhase → .active while the sheet is
+// up. Scott reported that an already-known flash drive showed as gray
+// (unavailable) and tapping it did nothing, forcing him to Add External
+// Destination and create a duplicate. Refreshing on appearance picks up
+// drives that were plugged in after the SelectionView's initial resolve.
+//
+// Duplicate avoidance: handleTargetSelected now returns a
+// TargetPickResult enum. When the picked URL matches a known target's
+// resolved path, that existing target is activated silently and the
+// naming alert is skipped — no duplicate created.
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -15,6 +27,7 @@ struct ManageTargetsView: View {
 
     var viewModel: SelectionViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     /// Controls the file picker for adding a new target.
     @State private var showingPicker = false
@@ -68,11 +81,31 @@ struct ManageTargetsView: View {
                 isPresented: $showingPicker,
                 allowedContentTypes: [.folder]
             ) { result in
-                if case .success(let url) = result {
-                    if viewModel.handleTargetSelected(url: url) {
-                        nameInput = viewModel.pendingTargetName
-                        showingNamePrompt = true
-                    }
+                guard case .success(let url) = result else { return }
+                switch viewModel.handleTargetSelected(url: url) {
+                case .new:
+                    nameInput = viewModel.pendingTargetName
+                    showingNamePrompt = true
+                case .existing:
+                    // Existing target was activated silently. Close the
+                    // sheet so the user sees the now-active destination
+                    // back on the main screen — the action they were
+                    // ultimately trying to take.
+                    dismiss()
+                case .failed:
+                    // Bookmark or security-scope failure. Silent for now;
+                    // user can retry. Surfacing an alert here is on the
+                    // deferred list.
+                    break
+                }
+            }
+            .task { viewModel.resolveKnownTargets() }
+            .onChange(of: scenePhase) { _, newPhase in
+                // Coming back from background often means a drive was
+                // just plugged in (or pulled). Re-resolve so the list's
+                // green/gray dots reflect reality before the user taps.
+                if newPhase == .active {
+                    viewModel.resolveKnownTargets()
                 }
             }
             .alert("Name This Destination", isPresented: $showingNamePrompt) {
@@ -137,8 +170,21 @@ struct ManageTargetsView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            if available {
-                viewModel.selectTarget(target)
+            // If the row is currently gray, refresh availability first —
+            // the drive may have become available since the list was
+            // last resolved (common when plugging in a drive while this
+            // sheet is open and scenePhase hasn't changed).
+            if !available {
+                viewModel.resolveKnownTargets()
+            }
+
+            let nowAvailable = viewModel.targetAvailability[
+                ObjectIdentifier(target)
+            ] ?? false
+            guard nowAvailable else { return }
+
+            viewModel.selectTarget(target)
+            if viewModel.activeTarget === target {
                 dismiss()
             }
         }
