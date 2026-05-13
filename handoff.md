@@ -1,8 +1,45 @@
 # Virtual Backup Box — Handoff Notes
 
-**Date:** 2026-04-22 (original) / 2026-05-12 (end-of-day update below)
+**Date:** 2026-04-22 (original) / 2026-05-13 (latest session below)
 **From:** Desktop session → Laptop continuation
-**Status:** All 7 modules built and tested on device. Core backup flow working.
+**Status:** All 7 modules built and tested on device. Core backup flow working. Source UI deliberately simplified to a single Choose Source button for core-functionality testing.
+
+---
+
+## 2026-05-13 Session — Re-prioritization
+
+Scott's overnight decision: shelve the auto-detect / quick-select rabbit hole and get back to battle-testing the core flow. The user-facing source experience is now one button.
+
+### What shipped today (commits 7807820 → 297c7df)
+
+1. **`7807820` — Force folder picker to Browse/Locations root every time.** `FolderPickerView` no longer reads the saved last-pick bookmark to position the picker. It always uses the non-resolving `directoryURL` trick so the picker lands at the Files Browse view with Locations visible, regardless of where the last source/destination pick landed. Bookmark-saving code is preserved (saved but unread) so a future revival of quick-select doesn't have to re-grant permissions.
+
+2. **`8ad7aaa` — Collapse source zone to a single Choose/Change Source button.** Removed the known-cards pulldown, Select Previous/New buttons, "On this device" internal-archives list, and the mounted-cards state plumbing from the UI. Label is "Choose Source" when nothing is picked, "Change Source" once something is. The `KnownCard.bookmarkData` capture in `SelectionViewModel.saveBookmark` still runs on every successful card pick — bookmarks accumulate behind the scenes for a future revival. `validateSourceStillValid()` still fires on scene-phase activation and at scan start, so card-pull / card-swap clears the source. Deleted `SelectionView+MountedCards.swift` (orphaned with the UI) and three orphaned ViewModel helpers (`internalArchives`, `recentKnownCards`, `selectInternalArchive`). Removed the "Forget Last Source" ellipsis menu item.
+
+3. **`7b96e79` — Add Choose Folder entry to Browse view.** `CardPickerView` gains a "Choose Folder…" button in a Section at the bottom of the list (always visible, even when no card mirrors exist). Tap → folder picker → `FileBrowserViewModel.loadArbitraryFolder(url:)` synthesizes a minimal `CardMirror`, security scope is retained for the browse session and released `onDisappear` of the destination view.
+
+4. **`297c7df` — Detect iCloud non-local files at scan time and block the session.** `SourceScannerService.enumerateSource` checks `URLResourceKey.ubiquitousItemDownloadingStatusKey` per file. Anything `.notDownloaded` is recorded on the new `ScanResult.cloudOnlyFiles` field and excluded from the copy pipeline. `InlineScanCard` shows a clear "N files aren't downloaded yet" warning with up to three example paths and instructions when `hasCloudOnlyBlock` is true, and omits the Start Copying button entirely.
+
+### Today's test plan (card → flash drive direct)
+
+1. Sideload the latest build (commit `297c7df`).
+2. Plug in **both** a camera card reader and a USB flash drive at the same time (USB hub or split adapter).
+3. Open the app. The Source zone should show a single "Choose Source" button. The Destination zone shows whatever target was last configured.
+4. Tap **Choose Source**. The picker should land at the Files Browse/Locations view — sidebar visible, drives & card listed. Scroll to the camera card, pick its root, confirm.
+5. In Manage Destinations, add the flash drive as a destination (if not already a known target). Make it the active destination.
+6. Tap **Verify Backup Flow** → confirm inline scan summary shows files to copy → tap **Start Copying**.
+7. **Mid-stream test #1 — pull the card.** Confirm the session ends, no false-positive alert, and any partial destination file is deleted (re-plug card → re-run → scan should resume cleanly via size-mismatch check).
+8. **Mid-stream test #2 — pull the flash drive.** Confirm the session ends cleanly. Re-plug → re-run → any partial destination file is overwritten on the re-copy pass.
+9. **Browse anywhere.** Open the Browse sheet (toolbar photo icon). Tap **Choose Folder…** at the bottom, pick any folder (an iCloud folder is a good test), confirm media files appear in the grid.
+10. **Cloud-only block.** Add an iCloud Drive folder as a source where at least one file is **not** downloaded ("Remove Download" via Files first). Verify Backup Flow should report "N files aren't downloaded yet" with no Start Copying button.
+
+### What was deliberately deferred (so it doesn't get lost)
+
+- **Third-party file-provider non-local detection.** Dropbox, Synology, Box.com, etc. don't surface `ubiquitousItemDownloadingStatusKey`. Their non-local files will currently fall through to the copy engine's per-file retry-then-skip path (per §5c) with a less helpful error message. Need to research per-provider APIs or look for a provider-agnostic resource key (possibly `NSFileProvider*` keys in iOS 17+).
+- **Quick-select / Select Previous UI resurrection.** All the underlying plumbing is intact (`KnownCard.bookmarkData` populated on every pick, `MountedVolumeService` still present, `validateSourceStillValid` still wired). Only the UI surface is gone. When core is battle-tested, this is where to dig back in — the FileProvider sleep retry hypothesis from `535263c` is still untested and may or may not be the fix.
+- **Internal archives as quick-source.** The "On this device" list in the source zone was removed. VBB Internal Storage remains as a destination via the normal target machinery. If the user wants quick re-pick of a previously-staged card as a source, they can use the file picker (the folder is at `Documents/VBB Internal Storage/...` and shows in Files under "On My iPad").
+- **Diagnostic logs around card-naming Confirm** (commit `7767bc7`). Still present in `SelectionViewModel.confirmCardName`. Remove after a few successful card namings confirm the freeze is gone.
+- **Items #16, #17** below — still relevant but lower priority than core testing.
 
 ---
 
