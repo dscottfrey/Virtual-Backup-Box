@@ -38,7 +38,7 @@ nonisolated enum SourceScannerService {
         verifiedRecords: [String: VerifiedFileInfo],
         onProgress: @Sendable (Int) -> Void
     ) -> ScanResult {
-        let (rawFiles, excludedCount) = enumerateSource(
+        let (rawFiles, excludedCount, cloudOnly) = enumerateSource(
             at: sourceURL,
             onProgress: onProgress
         )
@@ -56,6 +56,7 @@ nonisolated enum SourceScannerService {
             filesToVerifyOnly: toVerify,
             filesToSkip: toSkip,
             excludedCount: excludedCount,
+            cloudOnlyFiles: cloudOnly,
             totalBytesToCopy: toCopy.reduce(Int64(0)) { $0 + $1.fileSizeBytes },
             totalBytesToVerify: toVerify.reduce(Int64(0)) { $0 + $1.fileSizeBytes },
             sourceRootURL: sourceURL,
@@ -67,22 +68,47 @@ nonisolated enum SourceScannerService {
     // MARK: - Step 1: Enumerate Source Files
 
     /// Walks the source tree, applies exclusion rules, and returns all
-    /// regular files with their relative paths and sizes.
+    /// regular files with their relative paths and sizes. Files that live
+    /// in iCloud and are not downloaded to this device are pulled out into
+    /// a separate list so the scan-summary UI can warn the user and block
+    /// the session — see hasCloudOnlyBlock on ScanResult.
+    ///
+    /// Why cloud-only is checked here, not in CopyEngine:
+    /// Catching this at scan time means the user gets a single clear
+    /// "download these N files first" warning. Letting it through to copy
+    /// would surface as N per-file failures via the retry-then-skip path
+    /// (§5c) — same outcome, much worse UX.
+    ///
+    /// Why iCloud and not Dropbox/Synology/Box:
+    /// ubiquitousItemDownloadingStatusKey is iCloud's resource key.
+    /// Third-party file providers don't surface a "not downloaded" status
+    /// through this API — their files appear as ordinary local files
+    /// until you try to read one. Those failures will still surface, but
+    /// later, via the copy engine's per-file retry-then-skip warning. A
+    /// proper provider-agnostic detector is on the deferred list.
     private static func enumerateSource(
         at sourceURL: URL,
         onProgress: @Sendable (Int) -> Void
-    ) -> (files: [(url: URL, relativePath: String, size: Int64)], excludedCount: Int) {
-        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .isDirectoryKey]
+    ) -> (
+        files: [(url: URL, relativePath: String, size: Int64)],
+        excludedCount: Int,
+        cloudOnly: [String]
+    ) {
+        let keys: [URLResourceKey] = [
+            .isRegularFileKey, .fileSizeKey, .isDirectoryKey,
+            .ubiquitousItemDownloadingStatusKey
+        ]
 
         guard let enumerator = FileManager.default.enumerator(
             at: sourceURL,
             includingPropertiesForKeys: keys,
             options: []
         ) else {
-            return ([], 0)
+            return ([], 0, [])
         }
 
         var files: [(url: URL, relativePath: String, size: Int64)] = []
+        var cloudOnly: [String] = []
         var excludedCount = 0
         let progressInterval = 50
 
@@ -101,8 +127,23 @@ nonisolated enum SourceScannerService {
             }
 
             // Only process regular files (not directories or symlinks)
-            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            let values = try? fileURL.resourceValues(forKeys: [
+                .isRegularFileKey, .fileSizeKey,
+                .ubiquitousItemDownloadingStatusKey
+            ])
             guard values?.isRegularFile == true else { continue }
+
+            // iCloud "not downloaded" — record and skip from the copy
+            // pipeline. Recorded as relative path so the warning UI can
+            // name a few. The whole session is blocked downstream by
+            // ScanResult.hasCloudOnlyBlock.
+            if values?.ubiquitousItemDownloadingStatus == .notDownloaded {
+                let relative = DestinationPathService.relativePath(
+                    of: fileURL, relativeTo: sourceURL
+                )
+                cloudOnly.append(relative)
+                continue
+            }
 
             let size = Int64(values?.fileSize ?? 0)
             let relative = DestinationPathService.relativePath(
@@ -116,7 +157,7 @@ nonisolated enum SourceScannerService {
         }
 
         onProgress(files.count)
-        return (files, excludedCount)
+        return (files, excludedCount, cloudOnly)
     }
 
     // MARK: - Step 2: Categorise Files

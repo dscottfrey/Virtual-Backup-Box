@@ -24,6 +24,18 @@ struct ScanResult: Sendable {
     /// Number of macOS system files (e.g. .DS_Store) silently excluded.
     let excludedCount: Int
 
+    /// Files detected during scan that live in iCloud and have NOT been
+    /// downloaded to this device. Their relative paths are kept so the
+    /// scan-summary UI can name a few in the warning message. When this
+    /// is non-empty the session is blocked from starting — the user is
+    /// asked to download the files first. See §5c-extension (2026-05-13).
+    ///
+    /// Note: third-party file-provider sources (Dropbox, Synology, Box)
+    /// do not surface a notDownloaded status via the iCloud resource key
+    /// and so will not appear here. Those fall through to the copy
+    /// engine's existing retry-then-skip path with a per-file warning.
+    let cloudOnlyFiles: [String]
+
     /// Total bytes across all files that need copying.
     let totalBytesToCopy: Int64
 
@@ -40,7 +52,8 @@ struct ScanResult: Sendable {
     let sessionFolderName: String
 
     /// True when there is no work to do — all files are either verified in
-    /// the database or already at the destination.
+    /// the database or already at the destination. Does not consider
+    /// cloud-only files; check hasCloudOnlyBlock separately.
     var isFullyBackedUp: Bool {
         filesToCopy.isEmpty && filesToVerifyOnly.isEmpty
     }
@@ -48,5 +61,11 @@ struct ScanResult: Sendable {
     /// True when no files need copying but some need DB records created.
     var onlyNeedsVerification: Bool {
         filesToCopy.isEmpty && !filesToVerifyOnly.isEmpty
+    }
+
+    /// True when the session must be blocked because some source files
+    /// are not downloaded to this device.
+    var hasCloudOnlyBlock: Bool {
+        !cloudOnlyFiles.isEmpty
     }
 }

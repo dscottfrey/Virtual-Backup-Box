@@ -69,10 +69,15 @@ struct InlineScanCard: View {
 
     /// Shown once scanResult is set. Lays out the summary sections then
     /// the action buttons. The "all backed up" case collapses to a single
-    /// reassuring row plus a Done button.
+    /// reassuring row plus a Done button. Cloud-only files take precedence
+    /// over everything else: when present, the whole session is blocked
+    /// until the user downloads them — see cloudOnlyBlock.
     @ViewBuilder
     private func summaryContent(result: ScanResult) -> some View {
-        if result.isFullyBackedUp {
+        if result.hasCloudOnlyBlock {
+            cloudOnlyBlock(result: result)
+            doneButton
+        } else if result.isFullyBackedUp {
             allBackedUpRow
             doneButton
         } else {
@@ -94,6 +99,34 @@ struct InlineScanCard: View {
 
             startCopyingButton
             cancelButton
+        }
+    }
+
+    /// The hard-fail warning shown when the scan finds iCloud files in
+    /// the source that haven't been downloaded to this device. Names up
+    /// to three example file paths so the user can find them in Files.
+    /// The Start Copying button is omitted — Done is the only way out.
+    private func cloudOnlyBlock(result: ScanResult) -> some View {
+        let examples = result.cloudOnlyFiles.prefix(3).joined(separator: "\n")
+        let more = result.cloudOnlyFiles.count > 3
+            ? "\n\u{2026} and \(result.cloudOnlyFiles.count - 3) more"
+            : ""
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: "icloud.slash")
+                    .font(.title)
+                    .foregroundStyle(.orange)
+                Text("\(result.cloudOnlyFiles.count) files aren\u{2019}t downloaded yet")
+                    .font(.headline)
+            }
+            Text("These files live in iCloud and haven\u{2019}t been copied to this device. Open the source in Files, set the files (or the whole folder) to \u{201C}Keep on This Device,\u{201D} wait for the downloads to finish, then tap Verify Backup Flow again.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text("\(examples)\(more)")
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
         }
     }
 
