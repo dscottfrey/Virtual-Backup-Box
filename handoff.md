@@ -46,6 +46,20 @@ Five commits during testing today:
 - Step 10 (cloud-only block) — passed.
 - Resolve-delay UX (the "Checking availability" indicator from commit `096904d`) — added in response to Scott's "took quite a while to turn green, we should have a warning" note. Not yet re-tested as of this writing.
 
+### Deferred — "Select to Copy" partial-transfer flow
+
+Scott (2026-05-13 evening): "After the verify step, change the button that says 'Start copying' to 'Backup All' and add a second button under that that says 'select to copy'. That button should lead to a selection picker (same as the select in the browser does) and then the copy operation will only copy the selected files. This is actually a convenience. For example, I only want to open one file off a card in Lightroom, I can do that from the standard select box and then just back out and abort. Or, I can only copy a selection of files to an iCloud drive location. This is really not a backup exactly. Hence the different wording."
+
+Estimated scope when picked up: 1 new file (`FileSelectionSheet.swift`, multi-select list of `filesToCopy` with Select All toggle and "Copy [N] Selected" footer), 3 modified files (`InlineScanCard` for the two-button split, `SelectionView+SessionRoute` for plumbing the URL filter through, `BackupSessionService` to suppress the card's `lastBackupDate` update on partial copies). ~150 lines total, one commit.
+
+Design notes from the discussion:
+- Partial copy lands inside the card's regular `YYYYMMDD_friendlyname/` folder — a later Backup All will see those files as already verified and skip them. Correct behaviour.
+- Card's `lastBackupDate` does NOT update on partial copies — the source-zone "Last backed up" should still reflect the last real backup.
+- The session is still recorded in History (FileRecords are needed for incremental scan), but a future `CopySession.isPartialCopy` boolean would let the History row show a "partial" badge. Adding the field defaulted-to-false at the time we build the feature avoids a SwiftData migration later.
+- One-off destination folders that aren't a KnownTarget are explicitly out of scope; if Scott finds himself wanting that, it's a separate shape (no card→folder convention, no security-scoped bookmark to persist).
+
+Scott noted this is doable via the Files app today, just clunky — confirming "convenience" framing rather than core requirement.
+
 ### Deferred — picker no longer lands at root on source pick
 
 Scott (2026-05-13 evening test):
