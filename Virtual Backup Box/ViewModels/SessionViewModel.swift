@@ -129,4 +129,23 @@ class SessionViewModel {
         failureContinuation?.resume()
         failureContinuation = nil
     }
+
+    /// Called by the UI when the user taps "Cancel Session" on the
+    /// failure alert. The three steps must all happen so the suspended
+    /// copy loop both observes cancellation AND wakes up to act on it:
+    ///   1. Clear the pending-alert state so the alert dismisses.
+    ///   2. Cancel sessionTask so the loop's Task.isCancelled becomes true.
+    ///   3. Resume the continuation so waitForFailureDismissal returns,
+    ///      letting the loop reach its next cancellation check.
+    /// Step 3 alone (without step 2) would resume the loop only for it
+    /// to attempt the next file; step 2 alone would leave the continuation
+    /// hung forever because Task.cancel does not resume awaiting
+    /// withCheckedContinuation calls. Doing all three here keeps the
+    /// failure-alert site the single place that knows this dance.
+    func cancelFromFailureAlert() {
+        pendingFailureAlert = nil
+        sessionTask?.cancel()
+        failureContinuation?.resume()
+        failureContinuation = nil
+    }
 }
