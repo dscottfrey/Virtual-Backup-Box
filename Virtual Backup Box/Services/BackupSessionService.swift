@@ -14,6 +14,43 @@ import SwiftData
 
 enum BackupSessionService {
 
+    // MARK: - Failure Classification
+    //
+    // Categories of per-file failure surfaced to the user via the failure
+    // alert. Added 2026-05-13 (Scott): "can we detect for 'card not
+    // mounted' and report that as failure cause? (as opposed to say,
+    // file unreadable, which will happen, in which case we would
+    // 'continue backup', but that should be the failure cause if so.
+    // Probably trap all other failure causes)".
+    //
+    // The mount-state cases override per-file errors because they
+    // change what the user should do: a single .sourceReadError is a
+    // skip-this-file situation; a .sourceNotMounted means the whole
+    // session is bricked and the user should Cancel Session (or reconnect
+    // and Continue). The reason string in the alert reflects this.
+
+    /// Cause of a per-file failure after all copy/verify retries
+    /// exhausted. Determined by determineFailureCause().
+    enum FailureCause {
+        case sourceNotMounted
+        case destinationNotMounted
+        case sourceReadError
+        case destinationWriteError
+        case verificationMismatch
+        case unknown
+    }
+
+    /// What happened on a single copy+verify attempt. Used inside
+    /// processFile to record the most recent attempt's outcome so the
+    /// caller can categorise the overall failure.
+    private enum AttemptOutcome {
+        case succeeded
+        case threwSourceReadFailed
+        case threwDestinationWriteFailed
+        case threwOther
+        case verifyMismatch
+    }
+
     /// Runs a complete backup session from start to finish.
     ///
     /// Creates a CopySession, processes each file (copy → verify → retry),
@@ -79,7 +116,7 @@ enum BackupSessionService {
                 return
             }
 
-            let succeeded = await processFile(
+            let (succeeded, lastOutcome) = await processFile(
                 file,
                 sourceRootPath: sourceRootPath,
                 session: session,
@@ -104,7 +141,12 @@ enum BackupSessionService {
                 session.filesFailed += 1
                 sessionViewModel.filesFailed += 1
 
-                let reason = failureReason(for: file)
+                let cause = determineFailureCause(
+                    outcome: lastOutcome,
+                    sourceURL: scanResult.sourceRootURL,
+                    targetURL: scanResult.targetRootURL
+                )
+                let reason = failureReason(for: cause)
                 sessionViewModel.failedFiles.append(
                     (relativePath: file.relativePath, reason: reason)
                 )
@@ -178,16 +220,20 @@ enum BackupSessionService {
     // MARK: - Per-File Processing
 
     /// Attempts to copy and verify one file, retrying up to maxCopyRetries
-    /// times on failure. Returns true if the file was successfully verified.
+    /// times on failure. Returns a tuple of (succeeded, lastOutcome) — the
+    /// outcome records what happened on the most recent attempt so the
+    /// caller can categorise the overall failure for the user.
     private static func processFile(
         _ file: SourceFile,
         sourceRootPath: String,
         session: CopySession,
         sessionViewModel: SessionViewModel,
         modelContext: ModelContext
-    ) async -> Bool {
+    ) async -> (Bool, AttemptOutcome) {
+        var lastOutcome: AttemptOutcome = .threwOther
+
         for attempt in 1...Constants.maxCopyRetries {
-            if Task.isCancelled { return false }
+            if Task.isCancelled { return (false, lastOutcome) }
 
             do {
                 // Copy phase
@@ -238,9 +284,10 @@ enum BackupSessionService {
                     session.filesCopied += 1
                     sessionViewModel.filesCompleted += 1
                     sessionViewModel.totalBytesWritten += file.fileSizeBytes
-                    return true
+                    return (true, .succeeded)
 
                 case .failure:
+                    lastOutcome = .verifyMismatch
                     DebugLogService.shared.log(
                         "[BackupSession] verify failed attempt \(attempt)/\(Constants.maxCopyRetries) for \(file.relativePath)"
                     )
@@ -258,8 +305,14 @@ enum BackupSessionService {
                     DebugLogService.shared.log(
                         "[BackupSession] cancelled during \(file.relativePath)"
                     )
-                    return false
+                    return (false, lastOutcome)
                 }
+
+                // Map the CopyError to an AttemptOutcome so the caller
+                // can build a specific failure reason. Anything other
+                // than the named CopyError cases becomes .threwOther.
+                lastOutcome = outcomeFor(error: error)
+
                 // Catch was silent before 2026-05-12 — Scott hit a "Could
                 // not be backed up after 3 attempts" with no log line
                 // explaining which error fired. Logging the error type and
@@ -274,7 +327,21 @@ enum BackupSessionService {
                 }
             }
         }
-        return false
+        return (false, lastOutcome)
+    }
+
+    /// Translates a CopyEngine throw into the matching AttemptOutcome.
+    /// Unrecognised errors map to .threwOther — they'll surface as
+    /// .unknown in the user-facing cause.
+    private static func outcomeFor(error: Error) -> AttemptOutcome {
+        if let copyError = error as? CopyEngine.CopyError {
+            switch copyError {
+            case .sourceReadFailed: return .threwSourceReadFailed
+            case .destinationWriteFailed: return .threwDestinationWriteFailed
+            case .cancelled: return .threwOther
+            }
+        }
+        return .threwOther
     }
 
     // MARK: - Session Finalisation
@@ -298,8 +365,61 @@ enum BackupSessionService {
         sessionViewModel.completedSession = session
     }
 
-    /// Builds a human-readable failure reason for the alert.
-    private static func failureReason(for file: SourceFile) -> String {
-        "Could not be backed up after \(Constants.maxCopyRetries) attempts."
+    // MARK: - Failure Cause Classification
+
+    /// Decides which FailureCause to surface to the user. Mount-state
+    /// checks come first because they override per-file errors:
+    /// .sourceReadFailed when the whole card is gone is really
+    /// .sourceNotMounted, and we want the user to act on that fact
+    /// rather than thinking one file is broken.
+    ///
+    /// checkResourceIsReachable on a removable volume returns false
+    /// shortly after the volume's mount path disappears, even before
+    /// the security-scoped resource layer has caught up. That's the
+    /// behaviour we want here — the canonical signal that "the drive
+    /// is gone right now."
+    private static func determineFailureCause(
+        outcome: AttemptOutcome,
+        sourceURL: URL,
+        targetURL: URL
+    ) -> FailureCause {
+        let sourceReachable = (try? sourceURL.checkResourceIsReachable())
+            ?? false
+        let targetReachable = (try? targetURL.checkResourceIsReachable())
+            ?? false
+
+        if !sourceReachable { return .sourceNotMounted }
+        if !targetReachable { return .destinationNotMounted }
+
+        switch outcome {
+        case .threwSourceReadFailed: return .sourceReadError
+        case .threwDestinationWriteFailed: return .destinationWriteError
+        case .verifyMismatch: return .verificationMismatch
+        case .threwOther, .succeeded: return .unknown
+        }
+    }
+
+    /// Builds the human-readable reason string shown in the failure
+    /// alert and recorded on the failed-files list. Phrased so the
+    /// user can decide between Continue Backup (skip this file, keep
+    /// going) and Cancel Session — the recoverable single-file cases
+    /// are explicitly OK to continue; the mount-disconnected cases
+    /// strongly suggest Cancel.
+    private static func failureReason(for cause: FailureCause) -> String {
+        let retries = Constants.maxCopyRetries
+        switch cause {
+        case .sourceNotMounted:
+            return "The source has been disconnected. Reconnect it and tap Continue Backup, or Cancel Session."
+        case .destinationNotMounted:
+            return "The destination has been disconnected. Reconnect it and tap Continue Backup, or Cancel Session."
+        case .sourceReadError:
+            return "This file could not be read from the source after \(retries) attempts. Continue Backup will skip this file."
+        case .destinationWriteError:
+            return "This file could not be written to the destination after \(retries) attempts. Continue Backup will skip this file."
+        case .verificationMismatch:
+            return "The copy completed but verification failed after \(retries) attempts — the destination file does not match the source. Continue Backup will skip this file."
+        case .unknown:
+            return "Could not be backed up after \(retries) attempts. Continue Backup will skip this file."
+        }
     }
 }
