@@ -3,6 +3,21 @@
 //
 // Extension on SelectionView containing the Target and Source zone sub-views.
 // Split from the main view file to respect the ~200-line-per-file rule (§6.3).
+//
+// Source zone simplification (2026-05-13):
+// The source zone has been reduced to a single Choose Source / Change Source
+// button. Earlier iterations layered quick-select widgets (known-cards
+// pulldown, Select Previous button, "On this device" internal archives list,
+// mounted-card auto-detection) on top of the basic picker — none of which
+// could be made reliable enough on iOS without fighting the framework
+// (UserFS file-provider sleep, sandboxed app's lack of mountedVolumeURLs
+// visibility into camera-card volumes). Scott's direction (2026-05-13):
+// "I think the pre-selected source and destination rabbit hole is
+// sidetracking us so I would like to push that whole mess down the list
+// for after we get the full core functionality locked in." So: one button,
+// one picker, no clever layers. The KnownCard.bookmarkData capture in
+// SelectionViewModel remains untouched so a future revival of quick-select
+// has the permission ground already laid.
 
 import SwiftUI
 
@@ -48,146 +63,6 @@ extension SelectionView {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// Pulldown of known cards (no button — the action button lives in
-    /// the source zone's bottom row alongside "Select New" so the two
-    /// source-selection actions sit side by side).
-    ///
-    /// Design rationale (Scott's 2026-05-12 UX direction): users will
-    /// typically own multiple cards (one body, two cards; multiple bodies,
-    /// many cards). A per-row "Choose Previous" button scales poorly past
-    /// two cards. A single pulldown is cleaner. Defaults to the most-
-    /// recently backed-up card (top of recentKnownCards) because that's
-    /// what a returning user most likely wants.
-    ///
-    /// Layout history — what we tried and why this is the layout now:
-    /// First version placed the "Select Previous" button beside the
-    /// picker in an HStack. With a long card name like "Canon EOS R6
-    /// Card-256Gb", the picker text wrapped across three lines and the
-    /// helper text below it bled into the "Select Source" button beneath
-    /// the section (screenshot 2026-05-12 15:24). Splitting picker and
-    /// action button onto separate rows gives the picker the full row
-    /// width and keeps long names on one line.
-    @ViewBuilder
-    func knownCardsPicker(knownCards: [KnownCard]) -> some View {
-        let selected = currentlySelectedKnownCard(from: knownCards)
-        let canSelect = canSelectPreviousCard(from: knownCards)
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Known cards")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Picker(
-                "Known card",
-                selection: Binding(
-                    get: { selected?.uuid ?? knownCards.first?.uuid ?? "" },
-                    set: { selectedKnownCardUUID = $0 }
-                )
-            ) {
-                ForEach(knownCards, id: \.uuid) { card in
-                    Text(card.friendlyName).tag(card.uuid)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-
-            if let card = selected, !canSelect {
-                Text(helperText(for: card))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    /// Bottom action row of the source zone: "Select Previous" (only
-    /// shown when there are known cards other than the current source)
-    /// and "Select New" (always shown). Plain tappable text — no
-    /// .buttonStyle(.bordered), which on iOS 26 renders as large liquid-
-    /// glass pills that overwhelm the source-zone card. Plain text
-    /// buttons get the default borderless tinted style — blue and
-    /// readable, with the icon as the visual anchor.
-    ///
-    /// Both taps log on entry so the iCloud debug log can tell us if a
-    /// reported "button never becomes active" is a UI/hit-target issue
-    /// (no log line means tap was never received) versus state
-    /// propagation (log line fires but the sheet still doesn't appear).
-    @ViewBuilder
-    func sourceActionButtons(knownCards: [KnownCard]) -> some View {
-        HStack(spacing: 20) {
-            if !knownCards.isEmpty {
-                let canSelect = canSelectPreviousCard(from: knownCards)
-                Button {
-                    DebugLogService.shared.log("[SelectPrevious] tapped")
-                    if let card = currentlySelectedKnownCard(from: knownCards) {
-                        chooseKnownCard(card)
-                    }
-                } label: {
-                    Label("Select Previous", systemImage: "arrow.uturn.backward")
-                        .font(.subheadline)
-                }
-                .disabled(!canSelect)
-            }
-
-            Button {
-                DebugLogService.shared.log("[SelectNew] tapped — setting showingSourcePicker=true")
-                viewModel.showingSourcePicker = true
-            } label: {
-                Label("Select New", systemImage: "folder")
-                    .font(.subheadline)
-            }
-
-            Spacer()
-        }
-    }
-
-    /// Returns the KnownCard the user has chosen in the pulldown.
-    ///
-    /// Default-selection order when the user hasn't picked anything yet:
-    ///   1. A card that is mounted right now AND has a bookmark — Select
-    ///      Previous can act on it immediately, which is what the user
-    ///      almost always wants when a known card is plugged in.
-    ///   2. The first card in the list (sorted by last-backup-date desc).
-    ///
-    /// Earlier version always returned knownCards.first. With a recent
-    /// unmounted card and an older mounted card, that left the user
-    /// looking at a disabled Select Previous and a misleading "not
-    /// plugged in" helper — even though a usable mounted card was one
-    /// pulldown-tap away (Scott 2026-05-12).
-    private func currentlySelectedKnownCard(
-        from knownCards: [KnownCard]
-    ) -> KnownCard? {
-        if let uuid = selectedKnownCardUUID,
-           let match = knownCards.first(where: { $0.uuid == uuid }) {
-            return match
-        }
-        if let mountedAndBookmarked = knownCards.first(where: {
-            $0.bookmarkData != nil && mountedCardUUIDs.contains($0.uuid)
-        }) {
-            return mountedAndBookmarked
-        }
-        return knownCards.first
-    }
-
-    /// True when the currently-selected known card has a stored bookmark
-    /// AND is mounted right now — the only state where Select Previous
-    /// can succeed.
-    private func canSelectPreviousCard(from knownCards: [KnownCard]) -> Bool {
-        guard let card = currentlySelectedKnownCard(from: knownCards) else {
-            return false
-        }
-        return card.bookmarkData != nil
-            && mountedCardUUIDs.contains(card.uuid)
-    }
-
-    /// Plain-English explanation for why Select Previous is disabled for
-    /// the given card. Two cases mapped to two iOS limitations.
-    private func helperText(for card: KnownCard) -> String {
-        if card.bookmarkData == nil {
-            return "Pick \(card.friendlyName) once via Select New to enable quick-select"
-        }
-        return "\(card.friendlyName) is not plugged in"
-    }
-
     /// Shows available space with a warning if below threshold.
     func spaceLabel(bytes: Int64) -> some View {
         let text = ByteCountFormatter.string(
@@ -208,79 +83,69 @@ extension SelectionView {
 
     // MARK: - Source Zone
 
-    /// Shows the selected source folder or camera card, with a button to
-    /// select or change it. If a camera card is auto-detected on a mounted
-    /// volume, shows it as a one-tap option.
+    /// Shows the selected source's display name (if any) and a single
+    /// button — labelled "Choose Source" when nothing is picked yet,
+    /// "Change Source" once a source is in place.
+    ///
+    /// Internal layout note: the button label is computed from
+    /// viewModel.sourceURL so SwiftUI re-renders it the moment the source
+    /// is cleared (by the user or by validateSourceStillValid) and goes
+    /// back to "Choose Source" without any extra state.
     var sourceZone: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Source")
                 .font(.headline)
 
-            if viewModel.isReadingCard {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Reading card\u{2026}")
-                        .foregroundStyle(.secondary)
-                }
-            } else if let card = viewModel.selectedCard {
-                // Card icon sits with the title so the visual cue lives
-                // on the most prominent line. The camera-model subhead
-                // and the "Known cards" duplicate entry for this same
-                // card were dropped — the friendly name already includes
-                // the camera model in the suggested format.
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sdcard")
-                            .foregroundStyle(.secondary)
-                        Text(card.friendlyName).font(.title3)
-                    }
-                    if let lastBackup = card.lastBackupDate {
-                        Text("Last backed up: \(lastBackup, format: .dateTime.month().day().hour().minute())")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-            } else if viewModel.sourceURL != nil {
-                Text(viewModel.sourceDisplayName).font(.title3)
-            }
+            sourceContent
 
-            // Quick-select: internal archives (one-tap, no picker needed)
-            let archives = viewModel.internalArchives
-            if !archives.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("On this device")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    ForEach(archives, id: \.url) { archive in
-                        Button {
-                            viewModel.selectInternalArchive(
-                                url: archive.url, name: archive.name
-                            )
-                        } label: {
-                            Label(archive.name, systemImage: "internaldrive")
-                        }
-                        .font(.subheadline)
-                    }
-                }
+            Button {
+                DebugLogService.shared.log(
+                    "[ChooseSource] tapped — presenting picker"
+                )
+                viewModel.showingSourcePicker = true
+            } label: {
+                Label(chooseSourceButtonTitle, systemImage: "folder")
             }
-
-            // Known cards picker — the full history view. Shows every
-            // KnownCard, including the currently-selected one, so the
-            // user can scan their whole card list at a glance. Earlier
-            // versions excluded the active card; that hid useful context
-            // when the user wanted to confirm what was already picked,
-            // and combined with a most-recent-wins default selection it
-            // could leave the picker showing only unmounted cards even
-            // though a mounted card was in the DB (Scott 2026-05-12).
-            let knownCards = viewModel.recentKnownCards
-            if !knownCards.isEmpty {
-                knownCardsPicker(knownCards: knownCards)
-            }
-
-            sourceActionButtons(knownCards: knownCards)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// The Choose vs Change copy. Kept as a computed property so the
+    /// label updates reactively when sourceURL changes.
+    private var chooseSourceButtonTitle: String {
+        viewModel.sourceURL == nil ? "Choose Source" : "Change Source"
+    }
+
+    /// The current-source readout displayed above the button. Three states:
+    /// reading-card spinner, recognised camera card with friendly name and
+    /// last-backup date, or generic folder name. When nothing is picked yet
+    /// the readout is omitted entirely so the card collapses to just the
+    /// "Choose Source" button.
+    @ViewBuilder
+    private var sourceContent: some View {
+        if viewModel.isReadingCard {
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Reading card\u{2026}")
+                    .foregroundStyle(.secondary)
+            }
+        } else if let card = viewModel.selectedCard {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sdcard")
+                        .foregroundStyle(.secondary)
+                    Text(card.friendlyName).font(.title3)
+                }
+                if let lastBackup = card.lastBackupDate {
+                    Text("Last backed up: \(lastBackup, format: .dateTime.month().day().hour().minute())")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+            }
+        } else if viewModel.sourceURL != nil {
+            Text(viewModel.sourceDisplayName).font(.title3)
+        }
     }
 }

@@ -32,20 +32,6 @@ struct SelectionView: View {
     @State var sessionViewModel: SessionViewModel?
     @State var navigateToSession = false
 
-    /// UUIDs of KnownCards whose stored bookmark resolves to a reachable
-    /// URL right now — i.e. cards plugged in *and* with sandbox access
-    /// already granted. Populated by
-    /// SelectionView+MountedCards.refreshMountedCards(). Drives whether
-    /// the "Select Previous" button is enabled and which helper text the
-    /// source zone shows under the known-cards picker.
-    @State var mountedCardUUIDs: Set<String> = []
-
-    /// UUID of the KnownCard currently chosen in the source zone's
-    /// "Known cards" pulldown. Defaults on appear to the most-recently
-    /// backed-up card that isn't the current source. Stored as a String
-    /// so the binding survives SwiftData object refresh.
-    @State var selectedKnownCardUUID: String?
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -91,11 +77,6 @@ struct SelectionView: View {
                             Label("Settings", systemImage: "gear")
                         }
                         Divider()
-                        Button {
-                            FolderPickerView.clearBookmark()
-                        } label: {
-                            Label("Forget Last Source", systemImage: "arrow.uturn.backward")
-                        }
                         Button(role: .destructive) {
                             showingResetConfirmation = true
                         } label: {
@@ -108,13 +89,19 @@ struct SelectionView: View {
             }
             .task {
                 viewModel.setup(context: modelContext)
-                refreshMountedCards()
+                viewModel.validateSourceStillValid()
             }
             .onChange(of: scenePhase) { _, newPhase in
                 // Coming back from background often means a card was just
-                // plugged in or pulled. Refresh so the "Known cards" rows
-                // flip between actionable and gray immediately.
-                if newPhase == .active { refreshMountedCards() }
+                // plugged in or pulled. Revalidate the current source so a
+                // swapped or removed card clears immediately rather than
+                // surfacing at scan time. validateSourceStillValid is the
+                // only piece of the old mounted-cards machinery still wired
+                // up — the rest was UI-only and went away with the source
+                // zone simplification (2026-05-13).
+                if newPhase == .active {
+                    viewModel.validateSourceStillValid()
+                }
             }
             .sheet(isPresented: $viewModel.showingSourcePicker) {
                 FolderPickerView(
@@ -154,24 +141,14 @@ struct SelectionView: View {
             } message: {
                 Text("This deletes all backup history, file records, known cards, and known targets from the database. Files on disk are not affected. The app will behave as if freshly installed.")
             }
-            // A summary built from the previous Source/Target shouldn't linger
-            // once those inputs change. Easier (and safer) to clear and let
-            // the user re-tap "Verify Backup Flow" than to keep a stale card.
-            // Logs are temporary — diagnosing a freeze on the card naming
-            // dialog Confirm button. Remove once the cause is found.
-            //
-            // Also refresh the mounted-cards set on every sourceURL change.
-            // Without this, after a successful Select New the picker keeps
-            // showing the just-picked card as "not plugged in" until the
-            // user backgrounds and returns (Scott 2026-05-12). Refreshing
-            // here makes the picker reflect reality immediately.
+            // A scan summary built from the previous Source/Target shouldn't
+            // linger once those inputs change. Easier (and safer) to clear
+            // and let the user re-tap "Verify Backup Flow" than to keep a
+            // stale card.
             .onChange(of: viewModel.sourceURL) {
-                DebugLogService.shared.log("[onChange sourceURL] firing — clearing scanViewModel + refreshing mounted cards")
                 scanViewModel = nil
-                refreshMountedCards()
             }
             .onChange(of: viewModel.activeTargetURL) {
-                DebugLogService.shared.log("[onChange activeTargetURL] firing — clearing scanViewModel")
                 scanViewModel = nil
             }
             .navigationDestination(isPresented: $navigateToSession) {
@@ -188,10 +165,10 @@ struct SelectionView: View {
     /// SelectionView+SessionRoute.swift.
     ///
     /// Validates the source one more time at the moment of the tap. If
-    /// the card was pulled or swapped after Select Previous (and before
-    /// refreshMountedCards next ran), the source URL is stale. The
-    /// validator clears the source and returns false; we bail without
-    /// scanning. The Verify button will disable on the next render.
+    /// the card was pulled or swapped between picking and Verify, the
+    /// source URL is stale. The validator clears the source and returns
+    /// false; we bail without scanning. The Verify button will disable
+    /// on the next render.
     private func startScan() {
         guard viewModel.validateSourceStillValid() else {
             DebugLogService.shared.log(

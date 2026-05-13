@@ -66,54 +66,6 @@ class SelectionViewModel {
 
     var showingSourcePicker = false
 
-    // MARK: - Internal Storage Archives
-
-    /// Card archive folders found inside VBB Internal Storage. Each is a
-    /// backed-up card mirror (e.g. "20260421_EOS R6 Mark III Card-1") that
-    /// the user can select as a source for syncing to an external drive.
-    /// No picker needed — this is the app's own Documents directory.
-    var internalArchives: [(name: String, url: URL)] {
-        let storageURL = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        ).first!.appendingPathComponent("VBB Internal Storage")
-
-        guard let contents = try? FileManager.default.contentsOfDirectory(
-            at: storageURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else { return [] }
-
-        return contents.compactMap { url in
-            let isDir = (try? url.resourceValues(
-                forKeys: [.isDirectoryKey]
-            ))?.isDirectory ?? false
-            guard isDir else { return nil }
-            return (name: url.lastPathComponent, url: url)
-        }.sorted { $0.name > $1.name }
-    }
-
-    /// Known camera cards from the database, sorted by most recently backed
-    /// up. Shown in the source zone as a reminder of registered cards —
-    /// the user still needs the picker for iOS access, but this helps them
-    /// know which cards the app recognises.
-    var recentKnownCards: [KnownCard] {
-        guard let context = modelContext else { return [] }
-        let descriptor = FetchDescriptor<KnownCard>(
-            sortBy: [SortDescriptor(\.lastBackupDate, order: .reverse)]
-        )
-        return (try? context.fetch(descriptor)) ?? []
-    }
-
-    /// Selects an internal card archive as the source directly — no picker
-    /// needed since it is the app's own Documents directory.
-    func selectInternalArchive(url: URL, name: String) {
-        stopSourceAccess()
-        sourceURL = url
-        sourceIsCard = false
-        selectedCard = nil
-        sourceDisplayName = name
-    }
-
     // MARK: - Computed Properties
 
     /// True when both source and target are selected and accessible.
