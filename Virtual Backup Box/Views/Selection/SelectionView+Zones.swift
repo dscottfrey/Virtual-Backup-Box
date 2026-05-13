@@ -26,14 +26,27 @@ extension SelectionView {
     // MARK: - Target Zone
 
     /// Shows the active backup destination, or a prompt to add one.
+    /// The action button sits in the header row (right-justified) rather
+    /// than below the content — same shape as the source zone, easier
+    /// to reach. Tap opens the Manage Destinations sheet (replaces the
+    /// older "Manage" header button AND the bottom "Add Destination"
+    /// button; both routed there anyway).
     var targetZone: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Destination")
                     .font(.headline)
                 Spacer()
-                Button("Manage") { showingManageTargets = true }
+                Button {
+                    showingManageTargets = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(destinationButtonTitle)
+                        Image(systemName: "folder")
+                        Image(systemName: "externaldrive")
+                    }
                     .font(.subheadline)
+                }
             }
 
             if let target = viewModel.activeTarget {
@@ -51,16 +64,18 @@ extension SelectionView {
             } else {
                 Text("No destination connected.")
                     .foregroundStyle(.secondary)
-                Button {
-                    showingManageTargets = true
-                } label: {
-                    Label("Add Destination", systemImage: "folder.badge.plus")
-                }
             }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// "Choose" when nothing is active yet, "Change" once a destination
+    /// is selected. Mirrors the Source zone's button-label logic so the
+    /// two zones read the same.
+    private var destinationButtonTitle: String {
+        viewModel.activeTarget == nil ? "Choose" : "Change"
     }
 
     /// Shows available space with a warning if below threshold.
@@ -83,39 +98,45 @@ extension SelectionView {
 
     // MARK: - Source Zone
 
-    /// Shows the selected source's display name (if any) and a single
-    /// button — labelled "Choose Source" when nothing is picked yet,
-    /// "Change Source" once a source is in place.
-    ///
-    /// Internal layout note: the button label is computed from
-    /// viewModel.sourceURL so SwiftUI re-renders it the moment the source
-    /// is cleared (by the user or by validateSourceStillValid) and goes
-    /// back to "Choose Source" without any extra state.
+    /// Shows the selected source's display name (if any). The action
+    /// button sits in the header row (right-justified) rather than
+    /// below the content — Scott's 2026-05-13 layout request after
+    /// noticing the destination zone already had a header-right
+    /// "Manage" button and wanted the two zones to match.
     var sourceZone: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Source")
-                .font(.headline)
+            HStack {
+                Text("Source")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    DebugLogService.shared.log(
+                        "[ChooseSource] tapped — presenting picker"
+                    )
+                    viewModel.showingSourcePicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(sourceButtonTitle)
+                        Image(systemName: "folder")
+                        Image(systemName: "sdcard")
+                    }
+                    .font(.subheadline)
+                }
+            }
 
             sourceContent
-
-            Button {
-                DebugLogService.shared.log(
-                    "[ChooseSource] tapped — presenting picker"
-                )
-                viewModel.showingSourcePicker = true
-            } label: {
-                Label(chooseSourceButtonTitle, systemImage: "folder")
-            }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    /// The Choose vs Change copy. Kept as a computed property so the
-    /// label updates reactively when sourceURL changes.
-    private var chooseSourceButtonTitle: String {
-        viewModel.sourceURL == nil ? "Choose Source" : "Change Source"
+    /// "Choose" when nothing is picked yet, "Change" once a source is
+    /// in place. Computed from viewModel.sourceURL so SwiftUI re-renders
+    /// the label automatically when the source is cleared (by the user
+    /// or by validateSourceStillValid).
+    private var sourceButtonTitle: String {
+        viewModel.sourceURL == nil ? "Choose" : "Change"
     }
 
     /// The current-source readout displayed above the button. Three states:
