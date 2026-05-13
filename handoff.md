@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-05-13 Session — Re-prioritization
+## 2026-05-13 Session — Re-prioritization + on-device test fixes
 
-Scott's overnight decision: shelve the auto-detect / quick-select rabbit hole and get back to battle-testing the core flow. The user-facing source experience is now one button.
+Scott's overnight decision: shelve the auto-detect / quick-select rabbit hole and get back to battle-testing the core flow. The user-facing source experience is now one button. Three rounds of fixes followed from same-day on-device testing.
 
-### What shipped today (commits 7807820 → 297c7df)
+### Round 1 — initial simplification (commits 7807820 → 297c7df)
 
 1. **`7807820` — Force folder picker to Browse/Locations root every time.** `FolderPickerView` no longer reads the saved last-pick bookmark to position the picker. It always uses the non-resolving `directoryURL` trick so the picker lands at the Files Browse view with Locations visible, regardless of where the last source/destination pick landed. Bookmark-saving code is preserved (saved but unread) so a future revival of quick-select doesn't have to re-grant permissions.
 
@@ -19,6 +19,46 @@ Scott's overnight decision: shelve the auto-detect / quick-select rabbit hole an
 3. **`7b96e79` — Add Choose Folder entry to Browse view.** `CardPickerView` gains a "Choose Folder…" button in a Section at the bottom of the list (always visible, even when no card mirrors exist). Tap → folder picker → `FileBrowserViewModel.loadArbitraryFolder(url:)` synthesizes a minimal `CardMirror`, security scope is retained for the browse session and released `onDisappear` of the destination view.
 
 4. **`297c7df` — Detect iCloud non-local files at scan time and block the session.** `SourceScannerService.enumerateSource` checks `URLResourceKey.ubiquitousItemDownloadingStatusKey` per file. Anything `.notDownloaded` is recorded on the new `ScanResult.cloudOnlyFiles` field and excluded from the copy pipeline. `InlineScanCard` shows a clear "N files aren't downloaded yet" warning with up to three example paths and instructions when `hasCloudOnlyBlock` is true, and omits the Start Copying button entirely.
+
+### Round 2 — test-driven fixes from on-device session
+
+Five commits during testing today:
+
+5. **`9249100` — Available-space fallback for external drives.** `BookmarkService.availableSpace` tries `volumeAvailableCapacityForImportantUsageKey` (directive §1's specified key, intended for the primary device volume) and falls back to `volumeAvailableCapacityKey` when the primary returns 0 or nil. External USB drives now report real available bytes instead of triggering the bogus "Zero KB available" warning.
+
+6. **`062a783` — Cancel Session button on the per-file failure alert.** `FailureAlertModifier` gains a second button beside "Continue Backup". New `SessionViewModel.cancelFromFailureAlert()` atomically clears the alert, cancels the session task, and resumes the suspended continuation so the copy loop observes the cancellation. Pulling the source card mid-stream no longer requires cycling Continue → race-Cancel-during-retry.
+
+7. **`64618b4` — Manage Destinations: refresh availability and dedup re-picks.** Three pieces: re-resolves targets on sheet appear and on scenePhase active; gray-row tap attempts a fresh resolve before deciding to do nothing; `handleTargetSelected` now returns a `TargetPickResult` enum so an already-known drive is activated silently instead of creating a duplicate KnownTarget. Pre-existing duplicates need manual swipe-delete.
+
+8. **`36d59cb` — Categorised per-file failure causes.** New `FailureCause` enum (sourceNotMounted, destinationNotMounted, sourceReadError, destinationWriteError, verificationMismatch, unknown). `processFile` now returns the most recent `AttemptOutcome` alongside its bool; `determineFailureCause` checks mount state first (overrides per-file errors) then falls through to the outcome. Reason strings are phrased so the user can match cause to button: "Reconnect or Cancel Session" for mount issues, "Continue Backup will skip this file" for single-file errors.
+
+9. **`096904d` — Show "Checking availability…" while resolving.** `resolveKnownTargets` now wraps each per-target bookmark resolution in `Task.detached` so the main thread doesn't freeze during the multi-second wait for iOS's UserFS file provider to wake. New `isResolvingTargets` flag drives a ProgressView + footer message in `ManageTargetsView`. Rows update one-by-one as resolution completes rather than all-at-once at the end.
+
+### Round 2 test results (Scott on device)
+
+- Step 1, 2, 3 (simplified UI, root-landing picker, pick card) — passed.
+- Step 4 (add flash drive as destination) — first pass surfaced two issues now fixed: the "Zero KB available" warning (commit `9249100`) and the gray-known-drive selectability + duplicate-on-re-pick problem (commit `64618b4`).
+- Step 5 (card → flash drive direct backup) — passed.
+- Step 6 (pull card mid-stream) — passed, plus surfaced the missing Cancel button (now commit `062a783`) and the generic-reason problem (now commit `36d59cb`).
+- Step 7 (pull flash drive mid-stream) — passed.
+- Step 8 (pull flash drive mid-stream redo) — passed.
+- Step 9 (Browse → Choose Folder) — passed.
+- Step 10 (cloud-only block) — passed.
+- Resolve-delay UX (the "Checking availability" indicator from commit `096904d`) — added in response to Scott's "took quite a while to turn green, we should have a warning" note. Not yet re-tested as of this writing.
+
+### Deferred — picker no longer lands at root on source pick
+
+Scott (2026-05-13 evening test):
+> "since the last thing I did was choose an iCloud drive folder, that is where it took me to start, you 'on my iPad/iPhone' trigger is not working, note for later to work on it."
+
+The non-resolving `directoryURL` trick in `FolderPickerView.makeUIViewController` (the `/private/var/_force_browse_<UUID>` path) is no longer reliably routing the source picker to the Browse/Locations root. The picker is instead opening at whatever folder was last picked across the system (source OR destination — the destination flow uses a different picker but the cross-process Files state seems to share recent-location memory).
+
+Possible causes to investigate:
+- iOS 17+ may have changed how unreachable `directoryURL` values are handled — perhaps quietly falling back to "most recent" instead of the Browse root.
+- The fileImporter used for destinations vs the UIDocumentPicker used for sources may both feed a shared per-process Files state.
+- The destination-picking flow could be saving its own bookmark that's overriding our intent.
+
+Tonight's note for next session: this is the next picker-positioning challenge. Worth checking what iOS Files actually shows when the trick is invoked (does it briefly flash a Loading state? jump straight to a recent? error?), and whether a different `directoryURL` value (an empty URL, a documented but inaccessible system path) behaves differently. The picker's `shouldShowFileExtensions` or the use of `forOpeningContentTypes:` could also factor in.
 
 ### Today's test plan (card → flash drive direct)
 
