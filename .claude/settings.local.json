@@ -7,7 +7,13 @@
       "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -list)",
       "Bash(xcodebuild -project \"Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -configuration Debug -destination \"generic/platform=iOS\" -quiet build)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(xcodebuild -project \"/Users/scott/Documents/Code/Virtual Backup Box/Virtual Backup Box.xcodeproj\" -scheme \"Virtual Backup Box\" -destination \"generic/platform=iOS Simulator\" -configuration Debug build)",
+      "Bash(git commit *)",
+      "Bash(rm /tmp/vbb-commit-msg.txt)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(cat)",
+      "Read(//private/tmp/**)"
     ]
   }
 }
