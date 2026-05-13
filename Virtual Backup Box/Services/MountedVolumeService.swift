@@ -6,34 +6,32 @@
 // decide which "Known cards" rows are one-tap selectable.
 //
 // History — why we don't use FileManager.mountedVolumeURLs:
-// The first version of this service used FileManager.mountedVolumeURLs
-// with a removable/ejectable filter. It returned an empty array on iOS
-// even with a camera card visibly mounted in the system Files app
-// (debug log dump on 2026-05-12 showed count=0 while a card was actively
-// picked via the picker). iOS does not surface external removable volumes
-// to a sandboxed third-party app through that API — only the system Files
-// app / UIDocumentPicker has visibility. So that approach is dead. The
-// bookmark approach is the only sandbox-safe way to know whether a
-// previously-seen card is plugged in right now.
+// The first version of this service used FileManager.mountedVolumeURLs.
+// That API returned an empty array on iOS even when a camera card was
+// visibly mounted in the system Files app (debug dump 2026-05-12 showed
+// count=0 while a card was actively picked via the picker). iOS does not
+// surface external removable volumes to sandboxed third-party apps
+// through that API — only the system Files app / UIDocumentPicker has
+// visibility. The bookmark approach is the only sandbox-safe path.
 //
-// How the bookmark resolution doubles as both detection AND access:
-// A security-scoped bookmark stored at first-pick time both (a) survives
-// app restarts and (b) when resolved, can be combined with
-// startAccessingSecurityScopedResource() to regain sandbox access without
-// re-presenting the picker. So a single bookmark resolution per card
-// answers "is it mounted?" and "can I open it directly?" with one call.
-//
-// Limitation:
-// A KnownCard that has never been picked since the bookmarkData property
-// was introduced has no bookmark and cannot be detected. The UI shows
-// those cards as "Not yet saved" and guides the user to do one normal
-// "Select Source" pick to enable quick-select. After that, the card is
-// one-tap forever (until the bookmark goes stale, which is auto-refreshed
-// on each successful resolution).
+// Why resolution is async with a retry loop (2026-05-12, round 3):
+// iOS lazily wakes the "com.apple.filesystems.UserFS.FileProvider" that
+// serves a mounted external volume. The first resolution attempt right
+// after a refresh tick can throw NSFileProviderErrorDomain code -2001
+// ("No valid file provider found …") even though the card is physically
+// mounted and the bookmark itself is fine — confirmed by debug log
+// 16:53:24 (threw) and 16:54:59 (same bookmark, succeeded). The provider
+// is per-volume and goes to sleep independently when idle. Retrying with
+// short async delays lets the provider wake up before we conclude the
+// card is unplugged. Without this retry, the picker showed every card
+// as "not plugged in" intermittently. We keep the retry budget tight
+// (3 attempts × 200 ms) so the UI doesn't stall when a card really is
+// gone — that case throws a different error and exits the loop early.
 
 import Foundation
 import SwiftData
 
+@MainActor
 enum MountedVolumeService {
 
     /// Result of resolving one card's bookmark. Carries both whether the
@@ -44,17 +42,17 @@ enum MountedVolumeService {
         let url: URL?
     }
 
-    /// Returns the set of KnownCard UUIDs whose saved bookmark resolves to
-    /// a currently-reachable URL — i.e. cards that are plugged in *right
-    /// now*. Cards without a bookmark, or whose bookmark fails to resolve,
+    /// Returns the set of KnownCard UUIDs whose saved bookmark currently
+    /// resolves to a reachable URL — i.e. cards plugged in *right now*.
+    /// Cards without a bookmark, or whose bookmark fails after retries,
     /// are not included.
-    static func mountedKnownCardUUIDs(in context: ModelContext) -> Set<String> {
+    static func mountedKnownCardUUIDs(in context: ModelContext) async -> Set<String> {
         let descriptor = FetchDescriptor<KnownCard>()
         guard let cards = try? context.fetch(descriptor) else { return [] }
 
         var mounted: Set<String> = []
         for card in cards {
-            if resolve(card: card).isMounted {
+            if await resolve(card: card).isMounted {
                 mounted.insert(card.uuid)
             }
         }
@@ -67,23 +65,16 @@ enum MountedVolumeService {
     /// Resolves a single card's bookmark and returns whether it is mounted
     /// plus the live URL. Refreshes a stale bookmark in place.
     ///
-    /// Important — does NOT clear the bookmark on failure. On iOS,
-    /// URL(resolvingBookmarkData:) throws when the underlying external
-    /// volume is unmounted, even though the bookmark itself is still
-    /// good and will resolve again the next time the card is plugged in.
-    /// An earlier version cleared on every throw and broke the "plug
-    /// card back in while app is open" scenario (debug log 15:11:39).
+    /// Retry policy — on NSFileProviderErrorDomain -2001 ("file provider
+    /// not found"), waits 200 ms and tries again, up to 3 attempts total.
+    /// Any other error exits the loop immediately. This is the workaround
+    /// for iOS's lazy UserFS provider wake-up (see file header).
     ///
-    /// What changed 2026-05-12 (round 2): checkResourceIsReachable was
-    /// returning false on a successfully-resolved URL even with the card
-    /// visibly plugged in. Hypothesis under test: reachability on a
-    /// security-scoped, bookmark-resolved URL requires
-    /// startAccessingSecurityScopedResource() to be active first — the
-    /// sandbox treats the URL as inaccessible otherwise. So we now start
-    /// access for the reachability probe and stop it before returning.
-    /// (The caller's own scope management is unaffected.) Every branch
-    /// logs a distinct line so the next failure log identifies the cause.
-    static func resolve(card: KnownCard) -> Resolution {
+    /// Does NOT clear the bookmark on failure. iOS reports the same error
+    /// when (a) the card is physically unplugged and (b) the provider is
+    /// merely asleep — we can't distinguish them at the API level, so
+    /// keeping the bookmark gives the re-plug case a chance to recover.
+    static func resolve(card: KnownCard) async -> Resolution {
         guard let data = card.bookmarkData else {
             DebugLogService.shared.log(
                 "[MountedCards] \(card.friendlyName): bookmarkData is nil"
@@ -91,26 +82,51 @@ enum MountedVolumeService {
             return Resolution(isMounted: false, url: nil)
         }
 
+        var lastError: Error?
         var isStale = false
-        let url: URL
-        do {
-            url = try URL(
-                resolvingBookmarkData: data,
-                options: [],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )
-        } catch {
-            DebugLogService.shared.log(
-                "[MountedCards] \(card.friendlyName): URL(resolvingBookmarkData:) threw — \(error)"
-            )
-            return Resolution(isMounted: false, url: nil)
+
+        for attempt in 1...3 {
+            do {
+                let url = try URL(
+                    resolvingBookmarkData: data,
+                    options: [],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                return finishResolve(url: url, card: card, isStale: isStale)
+            } catch {
+                lastError = error
+                let nserror = error as NSError
+                let providerAsleep =
+                    nserror.domain == "NSFileProviderErrorDomain"
+                    && nserror.code == -2001
+                if providerAsleep && attempt < 3 {
+                    DebugLogService.shared.log(
+                        "[MountedCards] \(card.friendlyName): FileProvider not ready (attempt \(attempt)/3) — retrying in 200ms"
+                    )
+                    try? await Task.sleep(for: .milliseconds(200))
+                    continue
+                }
+                break
+            }
         }
 
-        // Start scoped access for the reachability probe, regardless of
-        // whether the start-access call returns true (some iOS versions
-        // return false on already-accessed URLs but still grant access).
-        // Stop on every exit path via the deferred block.
+        DebugLogService.shared.log(
+            "[MountedCards] \(card.friendlyName): bookmark did not resolve after retries — \(lastError.map { String(describing: $0) } ?? "no error")"
+        )
+        return Resolution(isMounted: false, url: nil)
+    }
+
+    /// Reachability probe + stale-refresh step. Split out of resolve()
+    /// so the retry loop above stays readable.
+    private static func finishResolve(
+        url: URL,
+        card: KnownCard,
+        isStale: Bool
+    ) -> Resolution {
+        // Start scoped access for the reachability probe. Some iOS
+        // versions return false on already-accessed URLs even though
+        // access is granted, so we don't depend on the return value.
         let started = url.startAccessingSecurityScopedResource()
         defer { if started { url.stopAccessingSecurityScopedResource() } }
 
@@ -118,7 +134,6 @@ enum MountedVolumeService {
             "[MountedCards] \(card.friendlyName): resolved to \(url.path) (isStale=\(isStale), accessStarted=\(started))"
         )
 
-        // Refresh stale bookmark silently so the next resolution is clean.
         if isStale {
             if let refreshed = try? url.bookmarkData(
                 options: [],
@@ -132,9 +147,6 @@ enum MountedVolumeService {
             }
         }
 
-        // A bookmark can resolve to a URL even when the volume is gone —
-        // the URL exists but the path is unreachable. checkResourceIsReachable
-        // is the authoritative "is this here right now?" check.
         let reachable: Bool
         do {
             reachable = try url.checkResourceIsReachable()
@@ -146,8 +158,6 @@ enum MountedVolumeService {
         }
 
         if !reachable {
-            // Cross-check with FileManager so the log distinguishes
-            // "sandbox can't see this path" from "path genuinely gone."
             let fmExists = FileManager.default.fileExists(atPath: url.path)
             DebugLogService.shared.log(
                 "[MountedCards] \(card.friendlyName): not reachable (FileManager.fileExists=\(fmExists))"

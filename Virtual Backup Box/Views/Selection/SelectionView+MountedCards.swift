@@ -32,10 +32,10 @@ import SwiftUI
 extension SelectionView {
 
     /// Refreshes the set of mounted-known-card UUIDs by resolving every
-    /// KnownCard's stored bookmark. Called on first appearance and on
-    /// every return to .active scenePhase, so plugging or unplugging a
-    /// card while the app is in the foreground updates the UI on the next
-    /// app activation.
+    /// KnownCard's stored bookmark. Async because the resolution loop can
+    /// retry through iOS's UserFS file-provider wake-up (see
+    /// MountedVolumeService). The Task lets SwiftUI keep painting while
+    /// the retries run; mountedCardUUIDs updates when the work finishes.
     ///
     /// Also validates the currently-selected source still points at the
     /// right card. If the user pulled the card and inserted a different
@@ -43,10 +43,13 @@ extension SelectionView {
     /// the scan would attribute new files to the old card's destination.
     /// validateSourceStillValid() catches that and clears the source.
     func refreshMountedCards() {
-        mountedCardUUIDs = MountedVolumeService.mountedKnownCardUUIDs(
-            in: modelContext
-        )
-        viewModel.validateSourceStillValid()
+        Task {
+            let mounted = await MountedVolumeService.mountedKnownCardUUIDs(
+                in: modelContext
+            )
+            mountedCardUUIDs = mounted
+            viewModel.validateSourceStillValid()
+        }
     }
 
     /// Handles a tap on a "Choose Previous" row. Resolves the card's
@@ -54,23 +57,25 @@ extension SelectionView {
     /// the normal source-selection pipeline — no picker is presented.
     ///
     /// If the bookmark fails to resolve at the moment of the tap (e.g.
-    /// the card was unplugged between the screen rendering and the tap),
-    /// we fall back to the normal picker so the user is never stranded.
+    /// the card was unplugged between the screen rendering and the tap,
+    /// or the FileProvider has gone to sleep and didn't wake within the
+    /// retry budget), we fall back to the normal picker so the user is
+    /// never stranded.
     func chooseKnownCard(_ card: KnownCard) {
-        let resolution = MountedVolumeService.resolve(card: card)
-        guard let url = resolution.url, resolution.isMounted else {
+        Task {
+            let resolution = await MountedVolumeService.resolve(card: card)
+            guard let url = resolution.url, resolution.isMounted else {
+                DebugLogService.shared.log(
+                    "[MountedCards] choose \(card.friendlyName) — bookmark stale at tap time; falling back to picker"
+                )
+                mountedCardUUIDs.remove(card.uuid)
+                viewModel.showingSourcePicker = true
+                return
+            }
             DebugLogService.shared.log(
-                "[MountedCards] choose \(card.friendlyName) — bookmark stale at tap time; falling back to picker"
+                "[MountedCards] choose \(card.friendlyName) — skipping picker, using bookmark URL"
             )
-            // Drop this card from the mounted set so the row goes gray
-            // on the very next layout pass, and open the picker.
-            mountedCardUUIDs.remove(card.uuid)
-            viewModel.showingSourcePicker = true
-            return
+            await viewModel.handleSourceSelected(url: url)
         }
-        DebugLogService.shared.log(
-            "[MountedCards] choose \(card.friendlyName) — skipping picker, using bookmark URL"
-        )
-        Task { await viewModel.handleSourceSelected(url: url) }
     }
 }
