@@ -121,7 +121,7 @@ struct SessionResultsView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Failed Files")
                 .font(.headline)
-            ForEach(Array(viewModel.failedFiles.enumerated()), id: \.offset) { _, file in
+            ForEach(viewModel.failedFiles.enumerated(), id: \.offset) { _, file in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(file.relativePath)
                         .font(.subheadline)

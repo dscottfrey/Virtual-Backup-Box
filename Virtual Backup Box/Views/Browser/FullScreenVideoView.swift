@@ -35,7 +35,7 @@ struct FullScreenVideoView: View {
             Color.black.ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
-                ForEach(Array(files.enumerated()), id: \.element.url) { index, file in
+                ForEach(files.enumerated(), id: \.element.url) { index, file in
                     VideoPlayer(player: AVPlayer(url: file.url))
                         .tag(index)
                 }

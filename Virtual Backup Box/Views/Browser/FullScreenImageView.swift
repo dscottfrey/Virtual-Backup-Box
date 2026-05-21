@@ -37,7 +37,7 @@ struct FullScreenImageView: View {
             Color.black.ignoresSafeArea()
 
             TabView(selection: $currentIndex) {
-                ForEach(Array(files.enumerated()), id: \.element.url) { index, file in
+                ForEach(files.enumerated(), id: \.element.url) { index, file in
                     ZoomableImageContent(url: file.url)
                         .tag(index)
                 }

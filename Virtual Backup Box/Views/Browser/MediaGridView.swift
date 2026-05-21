@@ -39,7 +39,7 @@ struct MediaGridView: View {
                 let cellSize = geometry.size.width / CGFloat(columnCount)
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 0) {
-                        ForEach(Array(files.enumerated()), id: \.element.url) { index, file in
+                        ForEach(files.enumerated(), id: \.element.url) { index, file in
                             ThumbnailCell(
                                 file: file,
                                 isVideo: viewModel.currentTab == .videos,
