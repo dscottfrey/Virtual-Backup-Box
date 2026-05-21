@@ -16,6 +16,7 @@ struct SessionGroup: Identifiable {
     var sessions: [CopySession]
 }
 
+@MainActor
 @Observable
 class HistoryViewModel {
 
