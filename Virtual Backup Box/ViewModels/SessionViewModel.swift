@@ -27,6 +27,7 @@ struct FailureAlert: Identifiable, Sendable {
     let reason: String
 }
 
+@MainActor
 @Observable
 class SessionViewModel {
 
