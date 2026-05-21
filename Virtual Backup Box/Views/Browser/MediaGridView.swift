@@ -106,7 +106,6 @@ struct MediaGridView: View {
         if viewModel.isSelecting {
             ToolbarItem(placement: .topBarLeading) {
                 Text("\(viewModel.selectedCount) selected")
-                    .fontWeight(.medium)
             }
             ToolbarItemGroup(placement: .bottomBar) {
                 Button("Select All") { viewModel.selectAll() }
