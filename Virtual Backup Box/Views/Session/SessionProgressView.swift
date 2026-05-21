@@ -13,7 +13,6 @@
 // and delegates actions to it.
 
 import SwiftUI
-import UIKit
 
 struct SessionProgressView: View {
 
@@ -37,10 +36,12 @@ struct SessionProgressView: View {
         .navigationTitle("Backing Up")
         .navigationBarBackButtonHidden(true)
         .failureAlert(viewModel: viewModel)
+        // Modern haptic API: .sensoryFeedback fires whenever the trigger
+        // value changes to a truthy state, replacing the older
+        // UINotificationFeedbackGenerator instance-and-call pattern.
+        .sensoryFeedback(.success, trigger: viewModel.isSessionComplete)
         .onChange(of: viewModel.isSessionComplete) {
             if viewModel.isSessionComplete {
-                UINotificationFeedbackGenerator()
-                    .notificationOccurred(.success)
                 onSessionComplete()
             }
         }
