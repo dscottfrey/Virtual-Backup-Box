@@ -14,6 +14,7 @@ import Foundation
 import SwiftData
 import Observation
 
+@MainActor
 @Observable
 class ScanViewModel {
 
