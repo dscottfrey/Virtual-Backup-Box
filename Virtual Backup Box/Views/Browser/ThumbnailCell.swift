@@ -29,7 +29,7 @@ struct ThumbnailCell: View {
                     .clipped()
             } else {
                 Rectangle()
-                    .fill(Color(.systemGray5))
+                    .fill(.quaternary)
                     .frame(width: size, height: size)
             }
 
@@ -45,7 +45,7 @@ struct ThumbnailCell: View {
                 }
                 .foregroundStyle(.white)
                 .padding(4)
-                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 4))
+                .background(.black.opacity(0.6), in: .rect(cornerRadius: 4))
                 .padding(4)
             }
 
@@ -68,9 +68,10 @@ struct ThumbnailCell: View {
     }
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
-        let total = Int(seconds)
-        let m = total / 60
-        let s = total % 60
-        return String(format: "%d:%02d", m, s)
+        // Duration.formatted(.time(pattern: .minuteSecond)) gives M:SS
+        // formatting without the C-style String(format:) call; same
+        // visual output, but localized and Swift-idiomatic.
+        Duration.seconds(Int(seconds))
+            .formatted(.time(pattern: .minuteSecond))
     }
 }
