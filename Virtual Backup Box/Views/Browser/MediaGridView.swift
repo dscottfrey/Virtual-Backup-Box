@@ -123,18 +123,3 @@ struct MediaGridView: View {
         }
     }
 }
-
-// MARK: - Share Sheet Wrapper
-
-/// UIViewControllerRepresentable wrapping UIActivityViewController for
-/// multi-file sharing. SwiftUI's ShareLink does not support bulk file URL
-/// sharing as of iOS 17 — this wrapper uses the documented Apple approach.
-struct ActivityViewWrapper: UIViewControllerRepresentable {
-    let urls: [URL]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: urls, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
-}
