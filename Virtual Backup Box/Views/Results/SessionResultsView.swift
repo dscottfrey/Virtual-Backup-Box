@@ -49,10 +49,10 @@ struct SessionResultsView: View {
         case .success:
             VStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(.green)
                 Text("Backup Complete")
-                    .font(.title2).fontWeight(.semibold)
+                    .font(.title2).bold()
                 Text("\(viewModel.session.filesCopied) files \u{2014} \(viewModel.formattedBytesCopied) \u{2014} all verified")
                     .foregroundStyle(.secondary)
             }
@@ -60,10 +60,10 @@ struct SessionResultsView: View {
         case .partialSuccess:
             VStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(.orange)
                 Text("Backup Completed with Warnings")
-                    .font(.title2).fontWeight(.semibold)
+                    .font(.title2).bold()
                 Text("\(viewModel.session.filesCopied) of \(viewModel.session.totalFilesFound - viewModel.session.filesSkipped) files backed up \u{2014} \(viewModel.session.filesFailed) could not be copied")
                     .foregroundStyle(.secondary)
             }
@@ -71,10 +71,10 @@ struct SessionResultsView: View {
         case .interrupted:
             VStack(spacing: 8) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 48))
+                    .font(.largeTitle)
                     .foregroundStyle(.red)
                 Text("Backup Interrupted")
-                    .font(.title2).fontWeight(.semibold)
+                    .font(.title2).bold()
                 Text("\(viewModel.session.filesCopied) of \(viewModel.session.totalFilesFound - viewModel.session.filesSkipped) files backed up before the session stopped")
                     .foregroundStyle(.secondary)
             }
