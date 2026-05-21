@@ -1,8 +1,88 @@
 # Virtual Backup Box — Handoff Notes
 
-**Date:** 2026-04-22 (original) / 2026-05-13 (latest session below)
+**Date:** 2026-04-22 (original) / 2026-05-20 (latest session below)
 **From:** Desktop session → Laptop continuation
-**Status:** All 7 modules built and tested on device. Core backup flow working. Source UI deliberately simplified to a single Choose Source button for core-functionality testing.
+**Status:** All 7 modules built and tested on device. Core backup flow working. Source UI deliberately simplified to a single Choose Source button for core-functionality testing. Codebase passed a SwiftUI Pro skill review on 2026-05-20; tier-1 mechanical fixes landed, two riskier tiers deferred (see below).
+
+---
+
+## 2026-05-20 Session — SwiftUI Pro review + Safe & mechanical fixes
+
+Ran the SwiftUI Pro skill against the whole codebase (Views + ViewModels + entry points). Eleven commits in two waves, build verified after each.
+
+### Wave 1 — Safe & mechanical (6 commits)
+
+1. **`a779ae1` — SessionProgressView: replace `UINotificationFeedbackGenerator` with `.sensoryFeedback`.** The UIKit haptic instance-and-call was swapped for SwiftUI's declarative `.sensoryFeedback(.success, trigger: viewModel.isSessionComplete)`. `.onChange(of: viewModel.isSessionComplete)` is retained but only calls `onSessionComplete()` now. Dropped the now-unused `import UIKit`.
+
+2. **`6cfc061` — Drop redundant `Array(_:)` wrapper around `enumerated()` in four `ForEach` sites.** `MediaGridView:42`, `FullScreenImageView:40`, `FullScreenVideoView:38`, `SessionResultsView:124`. ForEach accepts `EnumeratedSequence` directly on iOS 17+; the `Array` materialization was unnecessary copy work.
+
+3. **`8ba82d8` — SessionResultsView: Dynamic Type for outcome icons and headings.** `.font(.system(size: 48))` on the three outcome SF Symbols (checkmark/warning/x) → `.font(.largeTitle)`, so the icon scales with system text size. Three `.fontWeight(.semibold)` calls on the heading Text → `.bold()` per design.md (let the system pick weight).
+
+4. **`4f60353` — ThumbnailCell: modernize placeholder fill, shape syntax, and duration formatting.** `Color(.systemGray5)` → `.quaternary` (hierarchical, no UIKit reference, adapts to mode/context). `RoundedRectangle(cornerRadius: 4)` inside `.background(in:)` → `.rect(cornerRadius: 4)`. `String(format: "%d:%02d", m, s)` → `Duration.seconds(Int(seconds)).formatted(.time(pattern: .minuteSecond))`.
+
+5. **`2664223` — MediaGridView: drop scattered `.fontWeight(.medium)`.** Removed from the "N selected" Text in the multi-select toolbar; system default is already legible.
+
+6. **`1c734ce` — Extract `ActivityViewWrapper` from `MediaGridView.swift` into its own file** at `Views/Browser/ActivityViewWrapper.swift`. MediaGridView is now 127 lines (was 142) and holds one top-level type, satisfying §6.3. No functional change — the share-sheet wrapper is byte-identical, just relocated.
+
+### Wave 2 — `@MainActor` on all `@Observable` view models (5 commits)
+
+SwiftUI Pro / data.md: "`@Observable` classes must be marked `@MainActor` unless the project has Main Actor default actor isolation." The project does not have that default set, so each annotation was needed.
+
+7. **`4f7062c` — SessionViewModel.** Drives the running-backup UI; mutates `pendingFailureAlert` / `isSessionComplete` from UI callbacks; hands itself off to `BackupSessionService.runSession` (which works fine — Swift bridges MainActor instances to nonisolated async functions automatically).
+
+8. **`4e3f260` — HistoryViewModel.** Touches `ModelContext`, mutates session/group/card arrays read by the history browser. `detectStaleSessions` hops out via `Task.detached` for I/O and back to MainActor for the state update — the explicit isolation makes that back-hop unambiguously safe.
+
+9. **`64af42c` — ResultsViewModel.** Read exclusively from the post-session results screen.
+
+10. **`5a52cea` — ScanViewModel.** Drives the inline scan card; hops to detached for the scan run, writes the result back on return.
+
+11. **`9c3258f` — FileBrowserViewModel.** Owns card-mirror / media-tab / selection state for the file browser.
+
+All five compile clean. **Untested on device** — no behavior should change, but if a caller turns out to be background-isolated in a way the type system didn't catch (unlikely given Swift 6 strict concurrency was already enabled), a hang or stutter could surface. If something feels off in the next on-device run, this is the first place to look.
+
+### Memory note saved
+A project memory was written stating that **VoiceOver fixes are deprioritized** for this app (photo-backup tool for sighted photographers). Dynamic Type stays at normal priority — older users / reading glasses / Pro Display Zoom still matter. This affects how future SwiftUI Pro reviews rank findings: VO-only items go to the bottom.
+
+### Deferred — tier 2 & 3 fixes from the review
+
+These were flagged by the review but **not landed** because each has a real failure mode that compile-clean doesn't catch. Sequence and reasoning here so a future session doesn't have to redo the analysis.
+
+**Tier 2 — Needs build verification + manual exercise (do these before tier 3):**
+
+- **`Binding(get:set:)` in `FailureAlertModifier.swift:50–55`.** Rewrite to use `.alert(_:isPresented:presenting:)` so the optional `pendingFailureAlert` is unwrapped natively. **High blast radius.** The binding gates a `CheckedContinuation` that pauses `BackupSessionService.runSession`'s copy loop. Wrong-paths could:
+  - Hang the session forever (continuation never resumes).
+  - Trap on double-resume of `CheckedContinuation`.
+  - Swap Continue/Cancel semantics on swipe-to-dismiss (already burned us once — see the 2026-05-13 comment at line 14 of the file).
+  - **Mitigation:** rewrite, then manually exercise pull-card-mid-session and tap each of Continue / Cancel / background-dismiss before committing.
+
+- **`Task.detached` audit — narrow scope.** Convert the obvious cases in `HistoryViewModel:88` (just `FileManager.isReadableFile` over a Sendable array) and `SelectionViewModel+Targets:63` to plain `await` on a `nonisolated` helper. **Leave `ThumbnailService:29` and `:42` alone** — those are loading and decoding images, which is exactly the workload `Task.detached` exists for. Risk if done wrong: work ends up MainActor-isolated and freezes the UI during scanning. Reversible by single revert.
+
+**Tier 3 — Structural, ask before starting:**
+
+- **Extract `@ViewBuilder` helper properties in `SessionResultsView.swift` (4 helpers) and `InlineScanCard.swift` (5 helpers) into dedicated `View` structs in their own files.** Low semantic risk (state-ownership slip or missed `@Bindable` are the main traps) but touches a lot of code. Also helps the 200-line ceiling. Should be one struct at a time, build + render-preview between each.
+
+- **`GeometryReader` → `containerRelativeFrame` in `MediaGridView:38`.** Visual regression risk: padding/safe-area differences mean cell width can shift a few points, may look wrong on iPad split-view / landscape / rotation. Needs `RenderPreview` and real-device check; not a compile-time concern.
+
+**Won't touch (decided during the review):**
+
+- VoiceOver items: icon-only toolbar buttons in `MediaGridView:114, 119`; `.onTapGesture` lacking `.accessibilityAddTraits(.isButton)` in `MediaGridView:50` and `ManageTargetsView:188`. Deprioritized per the saved memory.
+- `String(format: "%02x", $0)` in `CopyEngine:131` and `VerificationEngine:165`. Hex encoding — no clean stdlib alternative.
+
+### Deferred — architectural concerns from the model-layer review
+
+The SwiftUI Pro pass touched Views/ViewModels but I also spot-read the models and the copy/verify engines. The following items are not Views/SwiftUI issues but are real and worth recording so they don't slip:
+
+- **`VerificationEngine.hashFile` silently `break`s on `Task.isCancelled`** (line 146), returning a *partial* hash. In `verify()` this is self-correcting (the partial hash won't match the source hash, so the destination is deleted) — but in `verifyExisting()` (lines 90–119, the self-heal path) the partial hash is written straight into a new `FileRecord`. **A cancelled self-heal would persist a wrong hash to the database.** Fix: throw `CancellationError()` instead of `break`. Small, contained.
+
+- **`KnownCard.sessions` cascade-deletes session history** when a card is deleted (KnownCard.swift:92). This contradicts the file header on `CopySession.swift` lines 13–16, which says target identity is kept by path string specifically to preserve history if the target goes away. The same logic should apply to cards — deleting a card from "Known Cards" management should not erase the historical record of those backups. Either drop the cascade or add a separate "Delete card AND its history" path.
+
+- **No `@Attribute(.unique)` on `KnownCard.uuid`** even though the header comment calls UUID "the primary identifier." A race during card-naming could create two rows for the same UUID. Adding the attribute now is cheap; later it requires a migration.
+
+- **No `@Attribute(.indexed)` / `@Index` on `FileRecord.relativeSourcePath`,** which is the lookup key for Module 2's incremental comparison. With thousands of FileRecords on a large library, the linear scan will start to bite. Cheap fix now, harder to retrofit later.
+
+- **No `VersionedSchema` / migration plan.** SwiftData handles trivial additive migrations on its own, but a renamed or moved property will require a migration scaffolded before the change ships. Worth setting up the bones before the next model touch.
+
+None of these are urgent for current testing, but each is the kind of thing that becomes a multi-hour rescue mission if discovered live on a real session. Add to the model-layer cleanup list when the user-facing items quiet down.
 
 ---
 
