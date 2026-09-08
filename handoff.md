@@ -27,6 +27,9 @@ Project has been `IPHONEOS_DEPLOYMENT_TARGET = 26.4` since the initial commit wh
 
 **Correction to the 2026-05-20 note on `6cfc061`:** it claimed `ForEach` accepts `EnumeratedSequence` directly "on iOS 17+". That is wrong — the Collection conformance arrived in the Swift 6.2 standard library and is availability-gated to iOS 26. The four sites (`MediaGridView`, `FullScreenImageView`, `FullScreenVideoView`, `SessionResultsView`) compile only because the target is 26.4. If the target is ever lowered, wrap those four `enumerated()` calls in `Array(...)` again.
 
+### Outcome (2026-09-08, later the same day)
+Scott archived in Xcode, uploaded, installed via TestFlight on device: **"built and installed, works."** So the Release configuration compiles clean, the privacy manifest passed App Store Connect's check, and automatic signing produced the distribution certificate and App Store profile without manual steps. TestFlight build **1.0 (1)** is the first shipped build. For the next upload, bump `CURRENT_PROJECT_VERSION` to 2 (App Store Connect rejects a repeated build number for the same version).
+
 ### Scott's steps in Xcode / App Store Connect (not automatable from Claude Code)
 1. App Store Connect → My Apps → **+** → New App. Platform iOS, name "Virtual Backup Box", bundle ID `com.scottfrey.Virtual-Backup-Box` (already registered by automatic signing), any SKU.
 2. Xcode: destination **Any iOS Device (arm64)** → **Product ▸ Archive**.
