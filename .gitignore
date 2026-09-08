@@ -1,1 +1,16 @@
+# Claude Code local permission overrides (machine-specific)
 .claude/settings.local.json
+
+# macOS Finder metadata
+.DS_Store
+
+# Xcode per-user state (window layout, breakpoints, scheme ordering).
+# These change every time Xcode is opened and carry no project meaning.
+# Untracked 2026-09-08 during TestFlight prep — they showed as "modified"
+# in every session and cluttered commits.
+xcuserdata/
+*.xcuserstate
+
+# Xcode build output if anyone builds from the command line into the repo
+DerivedData/
+build/
