@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  PrivacyInfo.xcprivacy — Virtual Backup Box
+
+  Apple's required privacy manifest. It is a declaration form, not code: it
+  tells App Store Connect which "required reason" system APIs this app uses
+  and why, using Apple's fixed reason codes. Uploads without it are rejected.
+
+  The app does no tracking and collects no user data, so those two sections
+  are declared false / empty.
+
+  Required-reason APIs actually used by this app (verified 2026-09-08):
+    - UserDefaults (CA92.1 = "access info from same app"): stores the
+      source-folder bookmark (FolderPickerView) and the debug-log folder
+      bookmark (DebugLogService). Nothing is shared with other apps.
+    - Disk space (E174.1 = "check for sufficient disk space to write files"):
+      BookmarkService reads volumeAvailableCapacity keys to show the soft
+      low-space warning before a backup session.
+
+  Not used, so not declared: file timestamps, system boot time, active
+  keyboards. If a future change reads file creation/modification dates,
+  add NSPrivacyAccessedAPICategoryFileTimestamp with reason C617.1 here.
+-->
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>E174.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
