@@ -1,8 +1,38 @@
 # Virtual Backup Box — Handoff Notes
 
-**Date:** 2026-04-22 (original) / 2026-05-20 (latest session below)
+**Date:** 2026-04-22 (original) / 2026-09-08 (latest session below)
 **From:** Desktop session → Laptop continuation
 **Status:** All 7 modules built and tested on device. Core backup flow working. Source UI deliberately simplified to a single Choose Source button for core-functionality testing. Codebase passed a SwiftUI Pro skill review on 2026-05-20; tier-1 mechanical fixes landed, two riskier tiers deferred (see below).
+
+---
+
+## 2026-09-08 Session — TestFlight preparation
+
+Goal: get the app ready to Archive and upload to TestFlight with Scott's developer signing. Read-only audit first, then four commits. **No Release build was compiled in this session** — the Claude Code sandbox blocks Xcode's build service from writing its build folder anywhere, so the first Archive in Xcode is also the first Release compile since 2026-05-20.
+
+### What was already in place (verified, no change needed)
+- Automatic signing on Debug and Release, team `B96HF9533R` (D. Scott Frey), bundle ID `com.scottfrey.Virtual-Backup-Box`. A development profile for this bundle ID exists on this Mac (expires 2027-05-12).
+- This Mac has an App Store distribution profile for Scott's Codex Reader app (June 2026), so the paid membership and App Store Connect flow already work. The distribution certificate could not be checked (sandbox blocks keychain reads) — Xcode will create one automatically if missing.
+- App icon: 1024 universal + dark + tinted. Version 1.0, build 1.
+- No permission-prompting APIs (photos, camera, location), so no usage strings needed. No `print` calls, no `#if DEBUG`. DebugLogService is user opt-in in Settings — fine to ship.
+
+### Commits
+1. **`d680cde` — PrivacyInfo.xcprivacy.** Required by App Store Connect. Declares UserDefaults (CA92.1) and DiskSpace (E174.1), no tracking, no collected data. Folder-synced group picks it up automatically.
+2. **`fb526f3` — `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`** on the app target (Debug + Release). SHA-256 hashing is exempt. **Verify after the first Archive** that the built Info.plist contains `ITSAppUsesNonExemptEncryption`; if not, fall back to a tiny Info.plist file with just that key.
+3. **.gitignore + untrack** `.DS_Store`, `UserInterfaceState.xcuserstate`, `xcschememanagement.plist`.
+4. Docs (this note + directive rev 3).
+
+### Minimum OS decision
+Project has been `IPHONEOS_DEPLOYMENT_TARGET = 26.4` since the initial commit while the directive said 17+. Scott first said iOS 18, then reversed to **26.4 — confirmed**. Directive updated to match.
+
+**Correction to the 2026-05-20 note on `6cfc061`:** it claimed `ForEach` accepts `EnumeratedSequence` directly "on iOS 17+". That is wrong — the Collection conformance arrived in the Swift 6.2 standard library and is availability-gated to iOS 26. The four sites (`MediaGridView`, `FullScreenImageView`, `FullScreenVideoView`, `SessionResultsView`) compile only because the target is 26.4. If the target is ever lowered, wrap those four `enumerated()` calls in `Array(...)` again.
+
+### Scott's steps in Xcode / App Store Connect (not automatable from Claude Code)
+1. App Store Connect → My Apps → **+** → New App. Platform iOS, name "Virtual Backup Box", bundle ID `com.scottfrey.Virtual-Backup-Box` (already registered by automatic signing), any SKU.
+2. Xcode: destination **Any iOS Device (arm64)** → **Product ▸ Archive**.
+3. Organizer → **Distribute App** → **TestFlight & App Store** (or App Store Connect ▸ Upload). Accept the automatic signing defaults.
+4. App Store Connect → TestFlight tab → add yourself as an internal tester → install via the TestFlight app on the iPad.
+5. If the upload emails an `ITMS-91053` privacy warning, the manifest is missing a category — add it to `PrivacyInfo.xcprivacy`.
 
 ---
 

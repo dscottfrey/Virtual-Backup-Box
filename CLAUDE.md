@@ -1,7 +1,7 @@
 # Virtual Backup Box — Claude Code Instructions
 
 **Project:** Virtual Backup Box
-**Platform:** iOS 17+ / iPadOS 17+
+**Platform:** iOS 26.4+ / iPadOS 26.4+
 **Language:** Swift / SwiftUI
 
 ---

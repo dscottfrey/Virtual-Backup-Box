@@ -1,8 +1,8 @@
 # Virtual Backup Box — Overall Directive
 
 **Status:** In Progress — being built collaboratively with Scott
-**Last Updated:** 2026-04-21 (rev 2)
-**Platform:** iPadOS 17+ (primary), iOS 17+ (secondary)
+**Last Updated:** 2026-09-08 (rev 3 — TestFlight prep)
+**Platform:** iPadOS 26.4+ (primary), iOS 26.4+ (secondary)
 **Language:** Swift / SwiftUI
 
 > This document is the authoritative spec for the entire app.
@@ -104,8 +104,11 @@ Organisation is the job of Lightroom, Capture One, or whatever the user prefers.
 
 ## §3 — Platforms and Deployment
 
-- **Primary target:** iPad (iPadOS 17+). The UI should be designed for iPad first.
-- **Secondary target:** iPhone (iOS 17+). Same codebase; layout adapts.
+- **Primary target:** iPad (iPadOS 26.4+). The UI should be designed for iPad first.
+- **Secondary target:** iPhone (iOS 26.4+). Same codebase; layout adapts.
+- **Minimum OS decision (2026-09-08):** 26.4 confirmed by Scott for the first TestFlight
+  build. Lowering it is not a settings-only change — four `ForEach(x.enumerated())` sites
+  rely on an iOS 26-only standard-library conformance and would need `Array(...)` back.
 - File access via Apple's standard document picker / UIDocumentPickerViewController or
   equivalent SwiftUI API. No jailbreak, no private API.
 - **One source card at a time.** The app does not handle multiple simultaneous sources.
@@ -367,7 +370,7 @@ folder remains untouched — no `.sha256` files, no hidden metadata, nothing une
 
 ### Why SwiftData
 
-SwiftData is Apple's persistence framework introduced in iOS 17 — our minimum target.
+SwiftData is Apple's persistence framework introduced in iOS 17, well below our minimum target.
 It is designed to work naturally with SwiftUI, requires minimal boilerplate, and uses
 SQLite under the hood without exposing it. Using SwiftData is the correct "work with
 Apple" choice here. No third-party database library is needed or wanted.
@@ -458,6 +461,7 @@ Describe the problem, propose an alternative, and let Scott decide.
 | 2026-04-22 | VBB Internal Storage: app creates Documents/VBB Internal Storage folder as a built-in target. UIFileSharingEnabled and LSSupportsOpeningDocumentsInPlace set so it appears in Files app. Internal archives shown as one-tap source options on the main screen. |
 | 2026-04-22 | Debug logging: file-based logger (DebugLogService) writes to user-selected iCloud Drive folder. Needed because USB port is occupied by card reader during testing. Configurable in Settings. |
 | 2026-04-22 | Terminology: all "iPad" references in code and UI replaced with "local storage." Cleanup offer trigger tightened to only fire when source is specifically VBB Internal Storage (not iCloud Drive or other "internal" volumes). |
+| 2026-09-08 | TestFlight prep. Minimum OS confirmed at iPadOS/iOS 26.4 (Scott briefly chose 18, then reversed). Added PrivacyInfo.xcprivacy (UserDefaults CA92.1, DiskSpace E174.1; no tracking, no data collection) and ITSAppUsesNonExemptEncryption = NO (SHA-256 hashing is exempt). Signing: Automatic, team B96HF9533R, bundle ID com.scottfrey.Virtual-Backup-Box. Xcode per-user state files untracked. |
 
 ---
 
