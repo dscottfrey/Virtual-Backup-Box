@@ -28,7 +28,12 @@ Project has been `IPHONEOS_DEPLOYMENT_TARGET = 26.4` since the initial commit wh
 **Correction to the 2026-05-20 note on `6cfc061`:** it claimed `ForEach` accepts `EnumeratedSequence` directly "on iOS 17+". That is wrong — the Collection conformance arrived in the Swift 6.2 standard library and is availability-gated to iOS 26. The four sites (`MediaGridView`, `FullScreenImageView`, `FullScreenVideoView`, `SessionResultsView`) compile only because the target is 26.4. If the target is ever lowered, wrap those four `enumerated()` calls in `Array(...)` again.
 
 ### Outcome (2026-09-08, later the same day)
-Scott archived in Xcode, uploaded, installed via TestFlight on device: **"built and installed, works."** So the Release configuration compiles clean, the privacy manifest passed App Store Connect's check, and automatic signing produced the distribution certificate and App Store profile without manual steps. TestFlight build **1.0 (1)** is the first shipped build. For the next upload, bump `CURRENT_PROJECT_VERSION` to 2 (App Store Connect rejects a repeated build number for the same version).
+Correction to an earlier draft of this note: "built and installed, works" referred to a direct Xcode install, not TestFlight. The actual sequence:
+- Scott archived 1.0 (1) in Xcode and uploaded via Organizer → **App Store Connect** (this Xcode labels the option "App Store Connect", not "TestFlight & App Store").
+- App Store Connect already held a **build 1 from June 2026** (unknown to this session — it expires ~2026-09-14). Xcode's "manage version and build number" therefore uploaded today's archive as **1.0 (2)**. The project file was not touched by that bump; `CURRENT_PROJECT_VERSION` is now set to 2 in this commit so source matches what shipped. Xcode will keep auto-bumping on upload regardless.
+- Build 2 went straight to **"Waiting for Review"** (external group) without stopping at "Missing Compliance", so the `ITSAppUsesNonExemptEncryption = NO` key works. No export-compliance question was asked.
+- Release configuration compiles clean; privacy manifest passed the upload check; automatic signing created the distribution certificate/profile without manual steps.
+- Tester groups: internal "Testers" (TE, Scott, installs immediately) and external "VBB external testers" (VE, needs Apple's Beta App Review, typically about a day). The Test Information form's pre-checked "Sign-in required" box must be **unchecked** — the app has no login.
 
 ### Scott's steps in Xcode / App Store Connect (not automatable from Claude Code)
 1. App Store Connect → My Apps → **+** → New App. Platform iOS, name "Virtual Backup Box", bundle ID `com.scottfrey.Virtual-Backup-Box` (already registered by automatic signing), any SKU.
