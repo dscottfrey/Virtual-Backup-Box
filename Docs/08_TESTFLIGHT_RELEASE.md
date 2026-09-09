@@ -17,6 +17,16 @@ for him to confirm before giving the next. Do not paste the whole list at him at
 - Builds go through the **Xcode app** (the command-line `xcodebuild` is not set up on this Mac).
 - Testers live in the **"Testers"** internal group in App Store Connect (automatic distribution
   is on, so a new build reaches them by itself once it finishes processing).
+- **Minimum OS: iPadOS/iOS 26.4.** A June 2026 session lowered it to 18.0; on 2026-09-08 Scott
+  set it back to 26.4 because he has no iOS 18 device to test on, and the four
+  `ForEach(x.enumerated())` sites depend on a Swift-library conformance marked iOS 26 only.
+  Do not lower it again without an iOS 18 device to test on and a build that compiles.
+- Build 2 (1.0 (2)) shipped 2026-09-08. Xcode bumps the build number itself on upload if the
+  project's number already exists in App Store Connect, but keep `CURRENT_PROJECT_VERSION` in
+  the project in step with what shipped so the source is honest.
+- The Test Information form pre-checks **"Sign-in required"**. Uncheck it — the app has no login.
+- Step 7 (encryption question) no longer appears: the project sets
+  `ITSAppUsesNonExemptEncryption = NO`, and a `PrivacyInfo.xcprivacy` is in the app folder.
 
 ---
 
