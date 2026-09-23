@@ -1,0 +1,3 @@
+- [Git commit style](feedback_git_commits.md) — include Scott's prompt and reason for change in every commit message
+- [No multi-choice widget](feedback_no_multichoice_widget.md) — ask clarifying questions in plain text, never via the AskUserQuestion picker
+- [Scott pushes to GitHub](feedback_scott_pushes.md) — Claude commits locally only; never push or offer to push
